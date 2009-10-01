@@ -16,6 +16,7 @@ module Base (
   , Net (..)
   , Srv (..)
   , Channel (..)
+  , Nick
 ) where
 
 import Control.Concurrent (forkIO)
@@ -40,6 +41,7 @@ type ChannelName = String
 
 data Srv = Srv SrvName PortNumber
 data Channel = Channel NetName ChannelName
+             deriving (Eq, Ord)
 -- has enough data to allow connections. multiple servers allow
 -- redundant connections
 data Net = Net NetName [Srv]

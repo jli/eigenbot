@@ -6,6 +6,7 @@ import Control.Monad (liftM2)
 import qualified Base as B
 import qualified Plugins.Pong
 import qualified Plugins.Simple
+import qualified Plugins.Postpone
 
 hardCodedState :: IO B.IrcState
 hardCodedState = do
@@ -13,7 +14,10 @@ hardCodedState = do
            newChan newChan
   where nets = [B.Net "sigil" [B.Srv "sigil.yi.org" 56667]]
         chans = [B.Channel "sigil" "#t", B.Channel "sigil" "#z"]
-        plugs = [Plugins.Pong.plugin, Plugins.Simple.plugin]
+        plugs = [ Plugins.Pong.plugin
+                , Plugins.Simple.plugin
+                , Plugins.Postpone.plugin
+                ]
 
 main :: IO ()
 main = do
