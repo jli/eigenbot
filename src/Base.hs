@@ -2,6 +2,7 @@ module Base (
     breakOnSpace
   , notMe
   , addAct
+  , say
   , runIrc
   , setup
   , Event (..)
@@ -107,6 +108,10 @@ isMe = (== me)
 
 addAct :: ActQ -> NetAction -> IO ()
 addAct = writeChan
+
+say :: ActQ -> NetName -> ChannelName -> String -> IO ()
+say actq net chan msg =
+    addAct actq $ NetAction net (DoChannelMsg chan msg)
 
 (+++) :: String -> String -> String
 "" +++ "" = ""

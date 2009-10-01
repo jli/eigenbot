@@ -19,24 +19,24 @@ loop evq actq = liftIO $ do
     case ev of
       B.ChannelMsg chan nick msg -> do
         let (cmd, rest) = B.breakOnSpace msg
-        maybeAction <-
+        maybeReply <-
               case cmd of
                 "!id" ->
                   let reply = printf "%s said:%s" nick rest
-                  in return $ Just $ B.DoChannelMsg chan reply
+                  in return $ Just $ reply
                 "!tell" ->
                   case words rest of
                     user:rest' ->
                       let reply = printf "hey %s, %s" user $ unwords rest'
-                      in return $ Just $ B.DoChannelMsg chan reply
+                      in return $ Just $ reply
                     _ -> return Nothing
                 "!date" -> do
                   clockTime <- getClockTime
                   let reply = printf "date is: %s" $ show clockTime
-                  return $ Just $ B.DoChannelMsg chan reply
+                  return $ Just $ reply
                 _ -> return Nothing
-        case maybeAction of
+        case maybeReply of
           Nothing -> return ()
-          Just action ->
-              when (B.notMe nick) $ B.addAct actq (B.NetAction net action)
+          Just reply ->
+              when (B.notMe nick) $ B.say actq net chan reply
       _ -> return ()
