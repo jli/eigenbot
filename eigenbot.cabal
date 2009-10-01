@@ -1,0 +1,25 @@
+name:    eigenbot
+version: 0.0
+author:  Ian Taylor <ian@lorf.org>, John Li <jli@circularly.org>
+license: WTFPL
+license-file: LICENSE
+
+-- ----------------------------------------
+
+cabal-version: >= 1.6
+build-type:    Simple
+
+-- ----------------------------------------
+
+executable eigenbot
+    hs-source-dirs: src
+    main-is: Main.hs
+    extensions: TemplateHaskell
+    ghc-options: -Wall -fwarn-tabs
+
+    build-depends:
+        base == 4.*
+      , containers
+      , hslogger
+      , hslogger-template
+      , template-haskell
