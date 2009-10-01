@@ -4,12 +4,14 @@ module Base (
   , addAct
   , runIrc
   , setup
-  , Plugin
   , Event (..)
   , Action (..)
   , NetEvent (..)
   , NetAction (..)
   , IrcState (..)
+  , Plugin
+  , PluginLoop
+  , genPlugin
   , Net (..)
   , Srv (..)
   , Channel (..)
@@ -62,7 +64,22 @@ data Action = DoJoin ChannelName
 data NetEvent = NetEvent NetName Event
 data NetAction = NetAction NetName Action
 
-type Plugin = Chan NetEvent -> Chan NetAction -> IO ()
+type EvQ = Chan NetEvent
+type ActQ = Chan NetAction
+
+type PluginStateT s = StateT s IO ()
+type PluginLoop s = EvQ -> ActQ -> PluginStateT s
+type Plugin = EvQ -> ActQ -> IO ()
+
+genPlugin :: String -> PluginLoop s -> s -> Plugin
+genPlugin description loop initState =
+    \evq actq -> do
+       printf "plugin starting: %s\n" description
+       runStateT (forever $ loop evq actq) initState
+       return ()
+
+runPlugin :: Plugin -> EvQ -> ActQ -> IO ()
+runPlugin plug evq actq = plug evq actq
 
 -- should track connection status...?
 data IrcState = IS {
@@ -70,8 +87,8 @@ data IrcState = IS {
     , stChannels :: [Channel]
     , stPlugins :: [Plugin]
     --, netCons :: Map Net Handle
-    , stEvq :: Chan NetEvent
-    , stAcq :: Chan NetAction
+    , stEvq :: EvQ
+    , stAcq :: ActQ
 }
 
 type Irc a = StateT IrcState IO a
@@ -88,7 +105,7 @@ notMe, isMe :: Nick -> Bool
 notMe = (/= me)
 isMe = (== me)
 
-addAct :: Chan NetAction -> NetAction -> IO ()
+addAct :: ActQ -> NetAction -> IO ()
 addAct = writeChan
 
 (+++) :: String -> String -> String
@@ -152,18 +169,18 @@ setup = do
       joinChans chans actq
       putStrLn "setup: done!"
 
-startPlugins :: [Plugin] -> Chan NetEvent -> Chan NetAction -> IO ()
+startPlugins :: [Plugin] -> EvQ -> ActQ -> IO ()
 startPlugins plugs evq actq = forM_ plugs startPlug
     where startPlug p = do
             dupEvq <- dupChan evq
-            forkIO $ p dupEvq actq
+            forkIO $ runPlugin p dupEvq actq
 
-joinChans :: [Channel] -> Chan NetAction -> IO ()
+joinChans :: [Channel] -> ActQ -> IO ()
 joinChans chans actq =
     forM_ chans $
       \(Channel net chan) -> addAct actq (NetAction net (DoJoin chan))
 
-connectNets :: [Net] -> Chan NetEvent -> Chan NetAction -> IO ()
+connectNets :: [Net] -> EvQ -> ActQ -> IO ()
 connectNets nets evq actq = do
     handleMap <- buildHandleMap nets
     forkEvqAggregator handleMap
@@ -194,7 +211,7 @@ connectNets nets evq actq = do
         initConnects handleMap =
           forM_ (M.keys handleMap) $ \net -> addAct actq (NetAction net (DoInit me))
 
-parseNetCon :: NetName -> Handle -> Chan NetEvent -> IO ()
+parseNetCon :: NetName -> Handle -> EvQ -> IO ()
 parseNetCon net h evq = do
     line <- hGetLine h
     printf "parseNetCon: %s: <%s>\n" net line

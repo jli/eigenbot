@@ -1,13 +1,16 @@
-module Plugins.Pong (go) where
+module Plugins.Pong (plugin) where
 
-import Base
 import Control.Concurrent.Chan (readChan)
-import Control.Monad (forever)
+import Control.Monad.Trans (liftIO)
 
-go :: Plugin
-go evq actq = forever $ loop
-  where loop = do
-          NetEvent net ev <- readChan evq
-          case ev of
-            Ping msg -> addAct actq (NetAction net $ DoPong msg)
-            _ -> return ()
+import qualified Base as B
+
+plugin :: B.Plugin
+plugin = B.genPlugin "pong: pongs to pings" loop ()
+
+loop :: B.PluginLoop ()
+loop evq actq = liftIO $ do
+    B.NetEvent net ev <- readChan evq
+    case ev of
+      B.Ping msg -> B.addAct actq (B.NetAction net $ B.DoPong msg)
+      _ -> return ()
