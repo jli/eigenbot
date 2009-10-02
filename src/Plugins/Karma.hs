@@ -29,8 +29,8 @@ data Update = Up B.Nick
 
 scoreNickPre, scoreNick :: String -> Maybe Update
 scoreNickPre ('+':'+':[]) = Nothing
-scoreNickPre ('+':'+':nick) = Just $ Up nick
 scoreNickPre ('-':'-':[]) = Nothing
+scoreNickPre ('+':'+':nick) = Just $ Up nick
 scoreNickPre ('-':'-':nick) = Just $ Down nick
 scoreNickPre _ = Nothing
 
