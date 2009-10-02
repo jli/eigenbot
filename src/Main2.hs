@@ -7,6 +7,7 @@ import qualified Base as B
 import qualified Plugins.Pong
 import qualified Plugins.Simple
 import qualified Plugins.Postpone
+import qualified Plugins.Karma
 
 hardCodedState :: IO B.IrcState
 hardCodedState = do
@@ -17,6 +18,7 @@ hardCodedState = do
         plugs = [ Plugins.Pong.plugin
                 , Plugins.Simple.plugin
                 , Plugins.Postpone.plugin
+                , Plugins.Karma.plugin
                 ]
 
 main :: IO ()

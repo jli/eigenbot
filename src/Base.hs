@@ -11,12 +11,15 @@ module Base (
   , NetAction (..)
   , IrcState (..)
   , Plugin
+  , PluginStateT
   , PluginLoop
   , genPlugin
   , Net (..)
   , Srv (..)
   , Channel (..)
   , Nick
+  , ChannelName
+  , NetName
 ) where
 
 import Control.Concurrent (forkIO)
