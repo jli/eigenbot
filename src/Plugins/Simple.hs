@@ -21,19 +21,14 @@ loop evq actq = liftIO $ do
         let (cmd, rest) = B.breakOnSpace msg
         maybeReply <-
               case cmd of
-                "!id" ->
-                  let reply = printf "%s said:%s" nick rest
-                  in return $ Just $ reply
+                "!id" -> return $ Just $ printf "%s said:%s" nick rest
                 "!tell" ->
                   case words rest of
                     user:rest' ->
-                      let reply = printf "hey %s, %s" user $ unwords rest'
-                      in return $ Just $ reply
+                      return $ Just $ printf "hey %s, %s" user $ unwords rest'
                     _ -> return Nothing
                 "!date" -> do
-                  clockTime <- getClockTime
-                  let reply = printf "date is: %s" $ show clockTime
-                  return $ Just $ reply
+                  return . Just . printf "date is: %s" . show =<< getClockTime
                 _ -> return Nothing
         case maybeReply of
           Nothing -> return ()
