@@ -34,15 +34,17 @@ scoreNickPre ('+':'+':nick) = Just $ Up nick
 scoreNickPre ('-':'-':nick) = Just $ Down nick
 scoreNickPre _ = Nothing
 
--- YUCK! not sure how to make this better
-scoreNick word =
-    case scoreNickPre word of
-      update@(Just _) -> update
-      Nothing ->
-        case scoreNickPre $ reverse word of
-          Just (Up nick) -> Just (Up $ reverse nick)
-          Just (Down nick) -> Just (Down $ reverse nick)
-          Nothing -> Nothing
+reverseUpdate :: Update -> Update
+reverseUpdate (Up s) = Up $ reverse s
+reverseUpdate (Down s) = Down $ reverse s
+
+ifNothing :: Maybe a -> Maybe a -> Maybe a
+Nothing `ifNothing` m = m
+j@(Just _) `ifNothing` _ = j
+
+scoreNick word = scoreNickPre word `ifNothing` maybeReversed
+  where maybeReversed =
+          fmap reverseUpdate (scoreNickPre $ reverse word)
 
 loop :: B.PluginLoop Points
 loop evq actq = do
