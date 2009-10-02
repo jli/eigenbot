@@ -4,8 +4,7 @@ module Plugins.Karma (plugin) where
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, modify)
 import Control.Concurrent.Chan (readChan)
-import Data.List (foldl')
-import Data.Map (Map, size)
+import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 import Text.Printf (printf)
