@@ -10,7 +10,7 @@ plugin = B.genPlugin "pong: pongs to pings" loop ()
 
 loop :: B.PluginLoop ()
 loop evq actq = liftIO $ do
-    B.NetEvent net ev <- readChan evq
+    ev <- readChan evq
     case ev of
-      B.Ping msg -> B.addAct actq (B.NetAction net $ B.DoPong msg)
+      B.Ping net msg -> B.addAction actq $ B.DoPong net msg
       _ -> return ()

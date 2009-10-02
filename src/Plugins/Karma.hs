@@ -48,20 +48,20 @@ scoreNick word = scoreNickPre word `ifNothing` maybeReversed
 
 loop :: B.PluginLoop Points
 loop evq actq = do
-    B.NetEvent net ev <- liftIO $ readChan evq
+    ev <- liftIO $ readChan evq
     case ev of
-      B.ChannelMsg chan nick msg -> handleChanMsg net chan nick msg
+      B.ChannelMsg chan nick msg -> handleChanMsg chan nick msg
       _ -> return ()
-  where handleChanMsg net chan _sendNick msg =
+  where handleChanMsg chan _sendNick msg =
           case words msg of
-            "!karma":nick:_ -> printPoints net chan nick
+            "!karma":nick:_ -> printPoints chan nick
             rest -> update rest msg
-        printPoints net chan nick = do
+        printPoints chan nick = do
             points <- get
             let reply = case M.lookup nick points of
                           Nothing -> printf "%s has 0 points" nick
                           Just p -> printf "%s has %d points" nick p
-            liftIO $ B.say actq net chan reply
+            liftIO $ B.say actq chan reply
         update msgWords _origMsg =
             updatePoints $ mapMaybe scoreNick msgWords
 

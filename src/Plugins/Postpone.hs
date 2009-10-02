@@ -45,25 +45,25 @@ getDate = do
 loop :: B.PluginLoop PluginState
 loop evq actq = do
     saveMap <- get
-    B.NetEvent net ev <- liftIO $ readChan evq
+    ev <- liftIO $ readChan evq
     case ev of
       B.ChannelMsg chan nick msg -> do
         case words msg of
           "!postpone":user:rest -> do
               time <- liftIO getDate
               let saved = SM nick user (unwords rest) time
-                  key = MsgKey (B.Channel net chan) user
+                  key = MsgKey chan user
               put $ M.insertWith' (++) key [saved] saveMap
-              liftIO $ B.say actq net chan (printf "message for %s saved" user)
+              liftIO $ B.say actq chan (printf "message for %s saved" user)
           _ -> return ()
       B.Join chan nick ->
-        let key = MsgKey (B.Channel net chan) nick in
+        let key = MsgKey chan nick in
         case M.lookup key saveMap of
           Nothing -> return ()
           Just saved -> do
             liftIO $ forM_ saved sendSaved
             put $ M.delete key saveMap
               where sendSaved (SM from to msg time) =
-                      B.say actq net chan $ printf "from %s on %s: %s: %s"
+                      B.say actq chan $ printf "from %s on %s: %s: %s"
                         from (calendarTimeString time) to msg
       _ -> return ()

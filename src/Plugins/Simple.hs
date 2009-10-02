@@ -15,7 +15,7 @@ plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop ()
 
 loop :: B.PluginLoop ()
 loop evq actq = liftIO $ do
-    B.NetEvent net ev <- readChan evq
+    ev <- readChan evq
     case ev of
       B.ChannelMsg chan nick msg -> do
         let (cmd, rest) = B.breakOnSpace msg
@@ -32,6 +32,5 @@ loop evq actq = liftIO $ do
                 _ -> return Nothing
         case maybeReply of
           Nothing -> return ()
-          Just reply ->
-              when (B.notMe nick) $ B.say actq net chan reply
+          Just reply -> when (B.notMe nick) $ B.say actq chan reply
       _ -> return ()
