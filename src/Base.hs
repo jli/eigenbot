@@ -4,6 +4,7 @@ module Base (
   , addAction
   , readEvent
   , say
+  , pm
   , runIrc
   , setup
   , newActq
@@ -136,6 +137,9 @@ isMe = (== me)
 
 say :: ActQ -> Channel -> String -> IO ()
 say actq chan msg = addAction actq $ DoChannelMsg chan msg
+
+pm :: ActQ -> NetName -> Nick -> String -> IO ()
+pm actq net nick msg = addAction actq $ DoPrivMsg net nick msg
 
 -- needs shorter name
 (+++) :: String -> String -> String
