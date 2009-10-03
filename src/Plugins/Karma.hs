@@ -1,6 +1,6 @@
 module Plugins.Karma (plugin) where
 
-
+import Control.Monad (mplus)
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, modify)
 import Data.Map (Map)
@@ -37,11 +37,7 @@ reverseUpdate :: Update -> Update
 reverseUpdate (Up s) = Up $ reverse s
 reverseUpdate (Down s) = Down $ reverse s
 
-ifNothing :: Maybe a -> Maybe a -> Maybe a
-Nothing `ifNothing` m = m
-j@(Just _) `ifNothing` _ = j
-
-scoreNick word = scoreNickPre word `ifNothing` maybeReversed
+scoreNick word = scoreNickPre word `mplus` maybeReversed
   where maybeReversed =
           fmap reverseUpdate (scoreNickPre $ reverse word)
 
