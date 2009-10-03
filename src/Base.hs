@@ -78,9 +78,7 @@ newActq :: IO ActQ
 newEvq = return . EvQ =<< newChan
 newActq = return . ActQ =<< newChan
 
-addEvent :: EvQ -> Event -> IO ()
 addAction :: ActQ -> Action -> IO ()
-addEvent (EvQ c) = writeChan c
 addAction (ActQ c) = writeChan c
 
 readEvent :: EvQ -> IO Event
