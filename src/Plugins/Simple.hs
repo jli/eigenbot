@@ -2,7 +2,6 @@ module Plugins.Simple (plugin) where
 
 import Control.Monad (when)
 import Control.Monad.Trans (liftIO)
-import Control.Concurrent.Chan (readChan)
 import System.Time (getClockTime)
 import Text.Printf (printf)
 
@@ -15,7 +14,7 @@ plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop ()
 
 loop :: B.PluginLoop ()
 loop evq actq = liftIO $ do
-    ev <- readChan evq
+    ev <- B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> do
         let (cmd, rest) = B.breakOnSpace msg

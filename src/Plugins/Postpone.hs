@@ -45,7 +45,7 @@ getDate = do
 loop :: B.PluginLoop PluginState
 loop evq actq = do
     saveMap <- get
-    ev <- liftIO $ readChan evq
+    ev <- liftIO $ B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> do
         case words msg of

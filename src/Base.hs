@@ -6,6 +6,8 @@ module Base (
   , say
   , runIrc
   , setup
+  , newActq
+  , newEvq
   , Event (..)
   , Action (..)
   , IrcState (..)
@@ -22,7 +24,7 @@ module Base (
 ) where
 
 import Control.Concurrent (forkIO)
-import Control.Concurrent.Chan (Chan, readChan, writeChan, dupChan)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan, dupChan)
 import Control.Monad (forever, forM_, foldM)
 import Control.Monad.State.Strict (StateT, runStateT, get)
 import Control.Monad.Trans (liftIO)
@@ -65,18 +67,30 @@ data Action = DoJoin Channel
             | DoInit NetName Nick
             | DoPong NetName String
 
-type EvQ = Chan Event
-type ActQ = Chan Action
+-- action and event queues
+newtype EvQ = EvQ (Chan Event)
+newtype ActQ = ActQ (Chan Action)
+
+newEvq :: IO EvQ
+newActq :: IO ActQ
+newEvq = return . EvQ =<< newChan
+newActq = return . ActQ =<< newChan
 
 addEvent :: EvQ -> Event -> IO ()
 addAction :: ActQ -> Action -> IO ()
-addEvent = writeChan
-addAction = writeChan
+addEvent (EvQ c) = writeChan c
+addAction (ActQ c) = writeChan c
 
 readEvent :: EvQ -> IO Event
 readAction :: ActQ -> IO Action
-readEvent = readChan
-readAction = readChan
+readEvent (EvQ c) = readChan c
+readAction (ActQ c) = readChan c
+
+writeEvent :: EvQ -> Event -> IO ()
+writeEvent (EvQ c) = writeChan c
+
+dupEvq :: EvQ -> IO EvQ
+dupEvq (EvQ c) = return . EvQ =<< dupChan c
 
 -- kind of gross
 type PluginStateT s = StateT s IO ()
@@ -194,8 +208,8 @@ setup = do
 startPlugins :: [Plugin] -> EvQ -> ActQ -> IO ()
 startPlugins plugs evq actq = forM_ plugs startPlug
     where startPlug p = do
-            dupEvq <- dupChan evq
-            forkIO $ runPlugin p dupEvq actq
+            evq' <- dupEvq evq
+            forkIO $ runPlugin p evq' actq
 
 joinChans :: [Channel] -> ActQ -> IO ()
 joinChans chans actq =
@@ -222,7 +236,7 @@ connectNets nets evq actq = do
 
         forkActqHandler handleMap = forkIO $ forever $ handleAction handleMap
         handleAction handleMap = do
-          act <- readChan actq
+          act <- readAction actq
           let net = actionToNet act
           case M.lookup net handleMap of
             Nothing -> printf "ERROR: no handle for net %s\n" net -- uhh....
@@ -243,7 +257,7 @@ parseNetCon net h evq = do
         -- FIXME really need that hslogger stuff
         --printf "     parse: IRCmsg: <%s>\n" (show msg)
         --printf "     parse:  event: <%s>\n" (show event)
-        maybe (return ()) (writeChan evq) (parseEvent net msg)
+        maybe (return ()) (writeEvent evq) (parseEvent net msg)
 
 sendAction :: Handle -> Action -> IO ()
 sendAction h act = hPutStr h $ actionToMsg act

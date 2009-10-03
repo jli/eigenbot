@@ -6,7 +6,6 @@
 
 # Clean-up, Refactoring
 - More abstract plugin interface. Plugin monad? Currently *extremely* boilerplate-y.
-- Abstract interface to event and action queues.
 - Unify Event and Action types, and/or event and action queues(?).
 - Better parseEvent and actionToMsg. Use Parsec or something for parseEvent.
 

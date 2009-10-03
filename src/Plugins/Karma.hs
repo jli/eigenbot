@@ -3,7 +3,6 @@ module Plugins.Karma (plugin) where
 
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, modify)
-import Control.Concurrent.Chan (readChan)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
@@ -48,7 +47,7 @@ scoreNick word = scoreNickPre word `ifNothing` maybeReversed
 
 loop :: B.PluginLoop Points
 loop evq actq = do
-    ev <- liftIO $ readChan evq
+    ev <- liftIO $ B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> handleChanMsg chan nick msg
       _ -> return ()
