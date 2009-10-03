@@ -64,7 +64,7 @@ instance Ord SimpleTime where
 
 data Commit = Commit {
       _cTitle :: String
-    , _cBy :: String
+    , _cAuthor :: String
     , cTime :: SimpleTime
 }
 
