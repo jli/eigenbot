@@ -134,7 +134,7 @@ pageToCommits :: String -> [Commit]
 pageToCommits = map entryToCommit . Atom.feedEntries . fromJust . parseAtomString
 
 entryToCommit :: Atom.Entry -> Commit
-entryToCommit entry = Commit author title time
+entryToCommit entry = Commit title author time
   where author = Atom.personName $ head $ Atom.entryAuthors entry
         time = parseGithubTime $ Atom.entryUpdated entry
         title = Atom.txtToString $ Atom.entryTitle entry
