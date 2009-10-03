@@ -3,7 +3,6 @@ module Plugins.Postpone (plugin) where
 import Control.Monad (forM_)
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
-import Control.Concurrent.Chan (readChan)
 import Data.Map (Map)
 import qualified Data.Map as M
 import System.Time (CalendarTime (..), getClockTime, toCalendarTime)
