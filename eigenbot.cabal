@@ -20,8 +20,10 @@ executable eigenbot
     build-depends:
         base == 4.*
       , containers
+      , feed
       , hslogger
       , hslogger-template
+      , HTTP
       , irc
       , mtl
       , network

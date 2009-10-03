@@ -9,6 +9,7 @@ module Base (
   , setup
   , newActq
   , newEvq
+  , ActQ
   , Event (..)
   , Action (..)
   , IrcState (..)
