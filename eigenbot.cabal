@@ -22,4 +22,8 @@ executable eigenbot
       , containers
       , hslogger
       , hslogger-template
+      , irc
+      , mtl
+      , network
+      , old-time
       , template-haskell
