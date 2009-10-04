@@ -28,4 +28,5 @@ executable eigenbot
       , mtl
       , network
       , old-time
+      , tagsoup
       , template-haskell
