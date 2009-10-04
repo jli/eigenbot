@@ -12,7 +12,7 @@ import Control.Monad.Trans (liftIO)
 import Data.List (isPrefixOf)
 import Data.Maybe (listToMaybe, maybe)
 
-import Network.Browser (browse, setAllowRedirects, request)
+import Network.Browser (browse, setAllowRedirects, setMaxRedirects, request)
 import Network.HTTP (getRequest, getResponseBody)
 import Text.HTML.TagSoup (Tag(..), sections, (~==))
 import Text.HTML.TagSoup.Parser (parseTags)
@@ -35,6 +35,7 @@ fetchUrl :: String -> IO String
 fetchUrl url = do
       (_, rsp) <- Network.Browser.browse $ do
                setAllowRedirects True -- handle HTTP redirects
+               setMaxRedirects $ Just 5
                request $ getRequest url
       getResponseBody $ Right rsp
 
