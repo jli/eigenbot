@@ -10,6 +10,7 @@ import qualified Plugins.Simple
 import qualified Plugins.Postpone
 import qualified Plugins.Karma
 import qualified Plugins.Github
+import qualified Plugins.UrlTitle
 
 $(deriveLoggers "HSL" [HSL.DEBUG])
 
@@ -24,6 +25,7 @@ hardCodedState = do
                 , Plugins.Postpone.plugin
                 , Plugins.Karma.plugin
                 , Plugins.Github.plugin
+                , Plugins.UrlTitle.plugin
                 ]
 
 main :: IO ()
