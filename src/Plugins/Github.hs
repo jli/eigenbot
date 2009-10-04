@@ -9,7 +9,7 @@
 
 module Plugins.Github (plugin) where
 
-import Control.Monad (foldM, forM_, mapM_)
+import Control.Monad (foldM, forM_, mapM_, when)
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
 import Control.Concurrent (threadDelay)
@@ -19,7 +19,7 @@ import Data.Maybe (fromJust)
 import Data.List (splitAt)
 import Text.Printf (printf)
 
-import Network.HTTP (simpleHTTP, getRequest, getResponseBody)
+import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 import Text.Feed.Import (parseFeedString)
 import Text.Feed.Types (Feed(..))
 import qualified Text.Atom.Feed as Atom
@@ -107,7 +107,7 @@ loop :: B.PluginLoop GithubState
 loop _evq actq = do
     St subscribed justStarted commits <- get
     newCommits <- liftIO $ fetchAll subscribed
-    liftIO $ announceNew actq justStarted newCommits commits
+    liftIO $ when (not justStarted) $ announceNew actq newCommits commits
     put $ St subscribed False newCommits
     liftIO $ delay 300 -- make configurable
 
@@ -152,13 +152,10 @@ parseGithubTime ghTime =
         (s, _t19) = appFst read $ splitAt 2 $ tail t16
 
 -- FIXME dense and ugly
-announceNew :: B.ActQ -> Bool -> Map Repo [Commit] -> Map Repo [Commit] -> IO ()
-announceNew actq justStarted newMap oldMap =
-    mapM_ announce limited
-  where limited = if justStarted
-                  then map (appSnd $ take 2) newCommits
-                  else newCommits
-        newCommits = M.toList $ foldr removeOld newMap (M.toList oldMap)
+announceNew :: B.ActQ -> Map Repo [Commit] -> Map Repo [Commit] -> IO ()
+announceNew actq newMap oldMap =
+    mapM_ announce newCommits
+  where newCommits = M.toList $ foldr removeOld newMap (M.toList oldMap)
         removeOld (repo, oldCommits) curMap =
             let newestOld = cTime $ head oldCommits  -- be safer
                 cur = fromJust $ M.lookup repo curMap
