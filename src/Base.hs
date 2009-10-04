@@ -1,5 +1,6 @@
 module Base (
     breakOnSpace
+  , me
   , notMe
   , addAction
   , readEvent
