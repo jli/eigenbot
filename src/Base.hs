@@ -1,6 +1,5 @@
 module Base (
-    breakOnSpace
-  , me
+    me
   , notMe
   , addAction
   , readEvent
@@ -39,6 +38,7 @@ import qualified Network.IRC.Base as IRC
 import qualified Network.IRC.Parser as IRC
 import Network (PortID(..), PortNumber, connectTo)
 
+import Util((+++))
 
 
 type Nick = String
@@ -128,9 +128,6 @@ type Irc a = StateT IrcState IO a
 me :: Nick
 me = "eigenbot"
 
-breakOnSpace :: String -> (String, String)
-breakOnSpace = break (== ' ')
-
 notMe, isMe :: Nick -> Bool
 notMe = (/= me)
 isMe = (== me)
@@ -140,13 +137,6 @@ say actq chan msg = addAction actq $ DoChannelMsg chan msg
 
 pm :: ActQ -> NetName -> Nick -> String -> IO ()
 pm actq net nick msg = addAction actq $ DoPrivMsg net nick msg
-
--- needs shorter name
-(+++) :: String -> String -> String
-"" +++ "" = ""
-s1 +++ "" = s1
-"" +++ s2 = s2
-s1 +++ s2 = s1 ++ (' ':s2)
 
 type IrcCmd = String
 

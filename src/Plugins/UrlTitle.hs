@@ -9,43 +9,14 @@ import Control.Exception (SomeException, try)
 import Control.Monad (mapM_)
 import Control.Monad.Trans (liftIO)
 import Data.List (find, isPrefixOf)
-import Data.Maybe (fromJust, isJust, isNothing, listToMaybe, maybe)
+import Data.Maybe (fromJust, isJust, isNothing, listToMaybe)
 
-import Network.Browser (browse, setAllowRedirects, setMaxRedirects, request)
-import Network.HTTP (getRequest, getResponseBody)
-import Network.HTTP.Base (Response(..), Request(..), RequestMethod(..))
 import Network.HTTP.Headers (Header(..), HeaderName(..))
 import Text.HTML.TagSoup (Tag(..), sections, (~==))
 import Text.HTML.TagSoup.Parser (parseTags)
 
 import qualified Base as B
-
-eitherToMaybe :: Either a b -> Maybe b
-eitherToMaybe = either (const Nothing) Just
-
-maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
-maybeIO f m = maybe (return ()) f m
-
-probablyUrl :: String -> Bool
-probablyUrl s =
-    "http://" `isPrefixOf` s ||
-    "https://" `isPrefixOf` s
-
--- must be a better way, but example in Network.Browser docs no longer worked
-fetchUrl :: String -> RequestMethod -> IO (Response String)
-fetchUrl url method = do
-      (_, rsp) <- Network.Browser.browse $ do
-               setAllowRedirects True -- handle HTTP redirects
-               setMaxRedirects $ Just 5
-               request $ ((getRequest url) { rqMethod = method })
-      return rsp
-
-getUrl :: String -> IO String
-getUrl url = fetchUrl url GET >>= getResponseBody . Right
-
-headUrl :: String -> IO [Header]
-headUrl url = fetchUrl url HEAD >>= return . rspHeaders
-
+import Util (getUrl, headUrl, probablyUrl, maybeIO, eitherToMaybe)
 
 plugin :: B.Plugin
 plugin = B.genPlugin "urltitle: fetches titles" loop ()

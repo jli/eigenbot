@@ -12,19 +12,18 @@ module Plugins.Github (plugin) where
 import Control.Monad (foldM, forM_, mapM_, when)
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
-import Control.Concurrent (threadDelay)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
 import Data.List (splitAt)
 import Text.Printf (printf)
 
-import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 import Text.Feed.Import (parseFeedString)
 import Text.Feed.Types (Feed(..))
 import qualified Text.Atom.Feed as Atom
 
 import qualified Base as B
+import Util (appFst, delay, simpleHttp)
 
 type User = String
 type Project = String
@@ -94,12 +93,6 @@ plugin = B.genPlugin
            loop
            initState
 
-delay :: Int -> IO ()
-delay = threadDelay . (* 10^(6::Integer)) -- better way to do this typehint?
-
-appFst :: (a -> z) -> (a, b) -> (z, b)
-appFst f (one, two) = (f one, two)
-
 -- use separate thread for polling?
 loop :: B.PluginLoop GithubState
 loop _evq actq = do
@@ -116,11 +109,8 @@ fetchAll repos =
           cs <- fetchCommits repo
           return $ M.insert repo cs commitMap
 
-httpFull :: Url -> IO String
-httpFull url = simpleHTTP (getRequest url) >>= getResponseBody
-
 fetchCommits :: Repo -> IO [Commit]
-fetchCommits repo = httpFull (rssUrl repo) >>= return . pageToCommits
+fetchCommits repo = simpleHttp (rssUrl repo) >>= return . pageToCommits
 
 parseAtomString :: String -> Maybe Atom.Feed
 parseAtomString s =

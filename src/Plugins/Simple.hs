@@ -7,6 +7,7 @@ import System.Time (getClockTime)
 import Text.Printf (printf)
 
 import qualified Base as B
+import Util (breakOnSpace)
 
 -- This simple plugin has () as state.
 
@@ -18,7 +19,7 @@ loop evq actq = liftIO $ do
     ev <- B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> do
-        let (cmd, rest) = B.breakOnSpace msg
+        let (cmd, rest) = breakOnSpace msg
             say = B.say actq chan
         case cmd of
           "!id" -> say $ printf "%s said:%s" nick rest
