@@ -98,9 +98,7 @@ delay :: Int -> IO ()
 delay = threadDelay . (* 10^(6::Integer)) -- better way to do this typehint?
 
 appFst :: (a -> z) -> (a, b) -> (z, b)
-appSnd :: (b -> z) -> (a, b) -> (a, z)
 appFst f (one, two) = (f one, two)
-appSnd f (one, two) = (one, f two)
 
 -- use separate thread for polling?
 loop :: B.PluginLoop GithubState
