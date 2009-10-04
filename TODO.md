@@ -4,6 +4,8 @@
 - Quotes plugin: !quote command for saving quotes. Parsing of irssi-like output so people can paste entire lines(?). !quote lastmsgfrom nick to save last message(?).
 - Weather plugin: !weather and !forecast. Take a zip code?
 - Zippy plugin: spout madness upon seeing uppercase channel messages
+- Dict plugin
+- Spell plugin
 - CTCP for.. something or other? http://www.irchelp.org/irchelp/rfc/ctcpspec.html
 - Config file and commandline selection of networks/channels/plugins.
 
@@ -11,7 +13,6 @@
 - More abstract plugin interface. Plugin monad? Currently *extremely* boilerplate-y.
 - Unify Event and Action types, and/or event and action queues(?).
 - Better parseEvent and actionToMsg. Use Parsec or something for parseEvent.
-- UrlTitle plugin needs to be more restrictive about what URLs to fetch (check Content-{length,type}).
 - Plugin-related types are confusing.
 - Use hslogger instead of putStrLn/printf.
 
