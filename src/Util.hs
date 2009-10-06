@@ -7,6 +7,7 @@ module Util (
   , dropNewlines
   , delay
   , doForever
+  , coin
   , eitherToMaybe
   , maybeIO
   , lookupExn
@@ -61,6 +62,9 @@ delay = threadDelay . (* 10^(6::Integer)) -- better way to do this typehint?
 
 doForever :: IO a -> IO ThreadId
 doForever = forkIO . forever
+
+coin :: Monad m => m ()
+coin = return ()
 
 eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe = either (const Nothing) Just

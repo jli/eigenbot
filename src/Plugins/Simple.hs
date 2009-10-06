@@ -2,7 +2,7 @@ module Plugins.Simple (plugin) where
 
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
-import Data.List (find)
+import Data.List (find, isPrefixOf, isSuffixOf)
 import Data.Maybe (fromJust, isJust)
 import System.Time (getClockTime)
 import System.Random (StdGen, next, mkStdGen)
@@ -50,7 +50,8 @@ cuteness nick msg gen =
     if not mentionedMe
     then Nothing
     else Just msgAndNewGen
-  where mentionedMe = isJust $ find (== B.me) $ words msg
+  where mentionedMe = isJust $ find includesMe $ words msg
+        includesMe str = B.me `isPrefixOf` str || B.me `isSuffixOf` str
         msgAndNewGen =
             let (i, gen') = next gen
                 formatFn = fromJust $ safeIndex cuteFormats i

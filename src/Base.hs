@@ -1,6 +1,5 @@
 module Base (
     me
-  , notMe
   , addAction
   , readEvent
   , say
@@ -11,7 +10,7 @@ module Base (
   , ActQ
   , Event (..)
   , Action (..)
-  , IrcState (..)
+  , BotConfig (..)
   , Plugin
   , PluginStateT
   , PluginLoop
@@ -26,11 +25,12 @@ module Base (
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan, dupChan)
-import Control.Monad (forever, forM_, foldM, liftM)
-import Control.Monad.State.Strict (StateT, runStateT, get)
+import Control.Monad (forever, forM_, foldM, liftM, liftM2)
+import Control.Monad.State.Strict (StateT, runStateT, get, put)
 import Control.Monad.Trans (liftIO)
 import Data.Map (Map)
 import qualified Data.Map as M
+import System.Exit (exitWith, ExitCode(..))
 import System.IO (Handle, hGetLine, hPutStr, hSetBuffering, BufferMode (..))
 import Text.Printf (printf)
 
@@ -38,13 +38,14 @@ import qualified Network.IRC.Base as IRC
 import qualified Network.IRC.Parser as IRC
 import Network (PortID(..), PortNumber, connectTo)
 
-import Util((+++), doForever, dropNewlines, maybeIO)
+import Util((+++), doForever, coin, dropNewlines, maybeIO)
 
 
 type Nick = String
 type NetName = String
 type SrvName = String
 type ChannelName = String
+type RootMap = Map NetName [Nick]
 
 data Srv = Srv SrvName PortNumber
 data Channel = Channel NetName ChannelName
@@ -107,28 +108,39 @@ genPlugin description loop initState =
 runPlugin :: Plugin -> EvQ -> ActQ -> IO ()
 runPlugin plug evq actq = plug evq actq
 
--- needs to track connection status, needs requestedConnects.
--- a main loop should track, do actions, and update appropriately.
--- how to communicate between main loop and plugins? another chan?
--- or maybe everything that changes this state should live in main loop?
+data BotConfig = BotConfig {
+      bcNets :: [Net] -- networks to always connect to
+    , bcChannels :: [Channel] -- should make sure Channel's net is connected to
+    , bcRoots :: RootMap
+    , bcPlugins :: [Plugin]
+}
+
+-- FIXME network connection requests are not implemented.
+-- do I really want request lists? probably. how about channel part
+-- lists? how to track dialog between actions and events, so errors
+-- can be reported back?
 data IrcState = IS {
-      stNets :: [Net] -- networks to always connect to
-    , stChannels :: [Channel]
-    , stPlugins :: [Plugin]
+      -- nets and chans I'm in
+      stInNets :: [Net]
+    , stInChannels :: [Channel]
+      -- nets and chans I'd like to be in
+    , stReqNets :: [Net]
+    , stReqChannels :: [Channel]
+    , stRoots :: RootMap -- per-network "root" users
+    , stPlugins :: [Plugin] -- not sure how to dynamically load plugins
     , stEvq :: EvQ
-    , stAcq :: ActQ
+    , stActq :: ActQ
 }
 
 type Irc a = StateT IrcState IO a
 
 
 
--- make this changeable?
+-- FIXME better: map of networks to nicks kept in state
 me :: Nick
 me = "eigenbot"
 
-notMe, isMe :: Nick -> Bool
-notMe = (/= me)
+isMe :: Nick -> Bool
 isMe = (== me)
 
 say :: ActQ -> Channel -> String -> IO ()
@@ -137,19 +149,35 @@ say actq chan msg = addAction actq $ DoChannelMsg chan msg
 pm :: ActQ -> NetName -> Nick -> String -> IO ()
 pm actq net nick msg = addAction actq $ DoPrivMsg net nick msg
 
+pong :: ActQ -> NetName -> String -> IO ()
+pong actq net msg = addAction actq $ DoPong net msg
+
+part :: ActQ -> Channel -> String -> IO ()
+part actq chan msg = addAction actq $ DoPart chan msg
+
+
 type IrcCmd = String
 
 genMsg, genMsgColon :: IrcCmd -> String -> String
 genMsg cmd rest = printf "%s %s\r\n" cmd rest
 genMsgColon cmd rest = genMsg cmd (':' : rest)
 
-actionToNet :: Action -> NetName
-actionToNet (DoJoin (Channel n _)) = n
-actionToNet (DoPart (Channel n _) _msg) = n
-actionToNet (DoChannelMsg (Channel n _) _msg) = n
-actionToNet (DoPrivMsg n _nick _msg) = n
-actionToNet (DoInit n _nick) = n
-actionToNet (DoPong n _msg) = n
+{- may be useful some day.
+netOfEvent :: Event -> NetName
+netOfEvent (Join (Channel n _) _nick) = n
+netOfEvent (Part (Channel n _) _nick _msg) = n
+netOfEvent (ChannelMsg (Channel n _) _nick _msg) = n
+netOfEvent (PrivMsg n _nick _msg) = n
+netOfEvent (Ping n _msg) = n
+-}
+
+netOfAction :: Action -> NetName
+netOfAction (DoJoin (Channel n _)) = n
+netOfAction (DoPart (Channel n _) _msg) = n
+netOfAction (DoChannelMsg (Channel n _) _msg) = n
+netOfAction (DoPrivMsg n _nick _msg) = n
+netOfAction (DoInit n _nick) = n
+netOfAction (DoPong n _msg) = n
 
 -- use irc's Message?
 actionToMsg :: Action -> String
@@ -179,26 +207,124 @@ parseEvent net (IRC.Message Nothing cmd params) =
       "PING" -> Just $ Ping net (params !! 0)
       _ -> Nothing
 
+
+
+
+-- should, like, clean up and wait on threads and stuff, somewhere
+runBot :: BotConfig -> IO ()
+runBot config = do
+    initState <- configToInitState config
+    runStateT setup initState
+    return ()
+
+configToInitState :: BotConfig -> IO IrcState
+configToInitState (BotConfig nets chans roots plugins) =
+    liftM2 (\evq actq -> IS { stInNets = [], stInChannels = []
+                            , stReqNets = nets, stReqChannels = chans
+                            , stRoots = roots, stPlugins = plugins
+                            , stEvq = evq, stActq = actq })
+           newEvq newActq
+
 -- needs some hslogger love
 -- need to move comments from here to some fancy architecture overview
 setup :: Irc ()
 setup = do
-    IS nets chans plugins evq actq <- get
-    liftIO $ do
-      -- hook up incoming events to evq through network parser, start
-      -- actq handler for dispatching actions to networks
-      connectNets nets evq actq
-      -- all plugins get all events
-      startPlugins plugins evq actq
-      joinChans chans actq
-    --listenLoop
+    liftIO $ putStrLn "begin setup"
+    -- called with state derived from BotConfig, so inNets and inChans
+    -- will be empty
+    st@(IS [] [] reqNets reqChans _roots plugins evq actq) <- get
+    -- hook up incoming events to evq through network parser, start
+    -- actq handler for dispatching actions to networks
+    liftIO $ putStrLn "connect nets"
+    inNets <- liftIO $ connectNets reqNets evq actq
+    -- all plugins get all events
+    liftIO $ startPlugins plugins evq actq
+    inChans <- liftIO $ joinChans reqChans actq
+    put $ st { stInNets = inNets, stInChannels = inChans
+             , stReqNets = [], stReqChannels = [] }
+    liftIO $ putStrLn "enter listen loop"
+    forever $ mainLoop
 
-connectNets :: [Net] -> EvQ -> ActQ -> IO ()
+-- main loop that controls IRC state. ultimately, would like to be
+-- able to control all aspects of behavior (network connections,
+-- channel membership, plugin activation). currently just handles
+-- requests to join, part, and die
+mainLoop :: Irc ()
+mainLoop = do
+    handleNewRequests
+    handleEvent
+
+handleNewRequests :: Irc ()
+handleNewRequests = do
+    st@(IS inNets inChans reqNets reqChans _roots _plugins _evq actq) <- get
+    (reqNets', newNets) <- liftIO $ connectNewNets actq reqNets
+    (reqChans', newChans) <- liftIO $ joinNewChans actq reqChans
+    put $ st { stInNets = inNets ++ newNets
+             , stInChannels = inChans ++ newChans
+             , stReqNets = reqNets'
+             , stReqChannels = reqChans' }
+  where connectNewNets _ [] = return ([], [])
+        connectNewNets _actq _requests = do
+          putStrLn "NETWORK CONNECTION REQUEST FAILED. Not implemented yet."
+          return ([], [])
+        joinNewChans actq requests = do
+          joinChans requests actq
+          return ([], requests)
+
+handleEvent :: Irc ()
+handleEvent = do
+    IS _inNets _inChans _reqNets _reqChans roots _plugins evq actq <- get
+    ev <- liftIO $ readEvent evq
+    case ev of
+      Ping net msg -> liftIO $ pong actq net msg
+      Join _chan _nick -> coin
+      Part _chan _nick _msg -> coin
+      ChannelMsg _chan _nick _msg -> coin -- leave to the plugins
+      PrivMsg net nick msg ->
+        if isRoot roots net nick
+        then controller net nick msg
+        else liftIO $ putStrLn "privmsg but NOT FROM A ROOT!"
+
+controller :: NetName -> Nick -> String -> Irc ()
+controller net nick msg = do
+    st@(IS _inNets _inChans _reqNets reqChans _roots _plugins _evq actq) <- get
+    let reply = pm actq net nick
+    case words msg of
+      ["!join", chan] -> do
+        liftIO $ reply "adding to requested channels"
+        put $ st { stReqChannels = (Channel net chan) : reqChans }
+      ["!part", chan] ->
+        liftIO $ do reply "leaving now..."
+                    part actq (Channel net chan) "PUPPETS SAY YES"
+      "!say":chan:rest ->
+        liftIO $ do reply "saying..."
+                    say actq (Channel net chan) $ unwords rest
+      "!pm":dstNick:rest ->
+        liftIO $ do reply "pming..."
+                    pm actq net dstNick $ unwords rest
+      ["!die"] ->
+        -- HANDLE STATE SERIALIZATION
+        liftIO $ do reply "dying!!!"
+                    exitWith ExitSuccess
+      _ ->
+        liftIO $ reply "didn't understand that! !join, !part, !say, !pm, !die"
+
+
+isRoot :: RootMap -> NetName -> Nick -> Bool
+isRoot roots net nick =
+    case M.lookup net roots of
+      Nothing -> False
+      Just nicks -> nick `elem` nicks
+
+-- currently assumes all attempts to connect to networks will be
+-- successful (like joinChans).
+connectNets :: [Net] -> EvQ -> ActQ -> IO [Net]
 connectNets nets evq actq = do
     handleMap <- buildHandleMap nets
     forkNetHandlers handleMap
     forkActionHandler handleMap
     initConnects handleMap
+    return $ nets
 
   where buildHandleMap = foldM insertHandle M.empty
         insertHandle _         (Net name []) = error $ "No servers for"+++name
@@ -232,7 +358,7 @@ netHandler net h evq = do
 actionHandler :: Map NetName Handle -> ActQ -> IO ()
 actionHandler handleMap actq = do
   act <- readAction actq
-  let net = actionToNet act
+  let net = netOfAction act
   case M.lookup net handleMap of
     Nothing -> error $ printf "no handle for net %s\n" net
     Just h -> do
@@ -250,11 +376,11 @@ startPlugins plugs evq actq = forM_ plugs startPlug
             evq' <- dupEvq evq
             forkIO $ runPlugin p evq' actq
 
-joinChans :: [Channel] -> ActQ -> IO ()
-joinChans chans actq = forM_ chans (\c -> addAction actq $ DoJoin c)
-
--- should, like, clean up and wait on threads and stuff, somewhere
-runBot :: IrcState -> IO ()
-runBot initState = do
-  runStateT setup initState
-  return ()
+-- currently just assumes we will successfully join any channel we try
+-- (like connectNets). perhaps better would be to return [] and only
+-- add channels to the internal state's inChannels list when we get a
+-- response from the IRC server.
+joinChans :: [Channel] -> ActQ -> IO [Channel]
+joinChans chans actq = do
+    forM_ chans (\c -> addAction actq $ DoJoin c)
+    return $ chans
