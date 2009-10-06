@@ -12,6 +12,7 @@ module Util (
   , headUrl
   , probablyUrl
   , simpleHttp
+  , safeIndex
 ) where
 
 import Control.Concurrent (threadDelay)
@@ -80,3 +81,7 @@ probablyUrl s =
 
 simpleHttp :: String -> IO String
 simpleHttp url = simpleHTTP (getRequest url) >>= getResponseBody
+
+safeIndex :: [a] -> Int -> Maybe a
+safeIndex [] _ = Nothing
+safeIndex xs i = Just $ xs !! (abs i `mod` length xs)
