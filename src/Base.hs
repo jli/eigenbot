@@ -225,9 +225,9 @@ connectNets nets evq actq = do
 netHandler :: NetName -> Handle -> EvQ -> IO ()
 netHandler net h evq = do
     line <- hGetLine h
-    printf "parseNetCon: %s: <%s>\n" net $ dropNewlines line
+    printf "from %s: <%s>\n" net $ dropNewlines line
     case IRC.decode line of
-      Nothing -> putStrLn "parseNetCon failed a parse!" -- FIXME debug error
+      Nothing -> putStrLn "netHandler failed a parse!" -- FIXME debug error
       Just msg -> maybeIO (addEvent evq) (parseEvent net msg)
 
 actionHandler :: Map NetName Handle -> ActQ -> IO ()
@@ -237,7 +237,7 @@ actionHandler handleMap actq = do
   case M.lookup net handleMap of
     Nothing -> error $ printf "no handle for net %s\n" net
     Just h -> do
-      printf "handleAction: %s: sending <%s>\n" net (dropNewlines $ actionToMsg act)
+      printf "to %s <%s>\n" net (dropNewlines $ actionToMsg act)
       sendActionToNet h act
 
 
