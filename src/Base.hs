@@ -27,9 +27,10 @@ module Base (
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan, dupChan)
-import Control.Monad (forever, forM_, foldM)
+import Control.Monad (forever, forM_, foldM, liftM)
 import Control.Monad.State.Strict (StateT, runStateT, get)
 import Control.Monad.Trans (liftIO)
+import Data.Map (Map)
 import qualified Data.Map as M
 import System.IO (Handle, hGetLine, hPutStr, hSetBuffering, BufferMode (..))
 import Text.Printf (printf)
@@ -38,7 +39,7 @@ import qualified Network.IRC.Base as IRC
 import qualified Network.IRC.Parser as IRC
 import Network (PortID(..), PortNumber, connectTo)
 
-import Util((+++))
+import Util((+++), doForever, dropNewlines, maybeIO)
 
 
 type Nick = String
@@ -60,9 +61,6 @@ data Event = Join Channel Nick
            | Ping NetName String
              deriving (Show)
 
--- bleh, same as Event but with fewer params. how about just use
--- Event, but fill in Nick field with appropriate data from actq
--- handler?
 data Action = DoJoin Channel
             | DoPart Channel String
             | DoChannelMsg Channel String
@@ -75,20 +73,22 @@ newtype EvQ = EvQ (Chan Event)
 newtype ActQ = ActQ (Chan Action)
 
 newEvq :: IO EvQ
+newEvq = EvQ `liftM` newChan
+
 newActq :: IO ActQ
-newEvq = return . EvQ =<< newChan
-newActq = return . ActQ =<< newChan
+newActq = ActQ `liftM` newChan
+
+readEvent :: EvQ -> IO Event
+readEvent (EvQ c) = readChan c
+
+readAction :: ActQ -> IO Action
+readAction (ActQ c) = readChan c
+
+addEvent :: EvQ -> Event -> IO ()
+addEvent (EvQ c) = writeChan c
 
 addAction :: ActQ -> Action -> IO ()
 addAction (ActQ c) = writeChan c
-
-readEvent :: EvQ -> IO Event
-readAction :: ActQ -> IO Action
-readEvent (EvQ c) = readChan c
-readAction (ActQ c) = readChan c
-
-writeEvent :: EvQ -> Event -> IO ()
-writeEvent (EvQ c) = writeChan c
 
 dupEvq :: EvQ -> IO EvQ
 dupEvq (EvQ c) = return . EvQ =<< dupChan c
@@ -161,7 +161,7 @@ actionToMsg (DoPrivMsg _net nick msg) = genMsgColon ("PRIVMSG"+++nick) msg
 actionToMsg (DoInit _net nick) = genMsg "NICK" nick ++ genMsg "USER" (nick ++ " 0 * :realname")
 actionToMsg (DoPong _net str) = genMsgColon "PONG" str
 
--- NEEDS VERIFICATION
+-- FIXME NEEDS VERIFICATION
 parseEvent :: NetName -> IRC.Message -> Maybe Event
 parseEvent net (IRC.Message (Just (IRC.NickName nick _user _server)) cmd params) =
     case cmd of
@@ -180,81 +180,79 @@ parseEvent net (IRC.Message Nothing cmd params) =
       "PING" -> Just $ Ping net (params !! 0)
       _ -> Nothing
 
+-- needs some hslogger love
+-- need to move comments from here to some fancy architecture overview
 setup :: Irc ()
 setup = do
     IS nets chans plugins evq actq <- get
     liftIO $ do
-    -- connect to networks, hook up incoming events to evq through
-    -- network parser, start actq handler for dispatching actions to
-    -- networks
-      putStrLn "setup: connecting to nets"
+      -- hook up incoming events to evq through network parser, start
+      -- actq handler for dispatching actions to networks
       connectNets nets evq actq
-    -- start plugins with evq. all plugins get all events. all plugins
-    -- can place actions on acq. all plugins can maintain internal
-    -- state
-      putStrLn "setup: starting plugins"
+      -- all plugins get all events
       startPlugins plugins evq actq
-    -- join chans
-      putStrLn "setup: joining chans"
       joinChans chans actq
-      putStrLn "setup: done!"
-
-startPlugins :: [Plugin] -> EvQ -> ActQ -> IO ()
-startPlugins plugs evq actq = forM_ plugs startPlug
-    where startPlug p = do
-            evq' <- dupEvq evq
-            forkIO $ runPlugin p evq' actq
-
-joinChans :: [Channel] -> ActQ -> IO ()
-joinChans chans actq =
-    forM_ chans $ addAction actq . DoJoin
+    --listenLoop
 
 connectNets :: [Net] -> EvQ -> ActQ -> IO ()
 connectNets nets evq actq = do
     handleMap <- buildHandleMap nets
-    forkEvqAggregator handleMap
-    forkActqHandler handleMap
+    forkNetHandlers handleMap
+    forkActionHandler handleMap
     initConnects handleMap
 
-  where buildHandleMap = foldM insertNetHandle M.empty
-        insertNetHandle _   (Net name []) = error ("No servers for"+++name)
-        insertNetHandle handleMap (Net name ((Srv srv port):_rest)) = do
+  where buildHandleMap = foldM insertHandle M.empty
+        insertHandle _         (Net name []) = error $ "No servers for"+++name
+        insertHandle handleMap (Net name ((Srv srv port):_rest)) = do
           handle <- connectTo srv (PortNumber port)
-          printf "connectNets: connected to %s via %s!\n" name srv
-          hSetBuffering handle NoBuffering
+          hSetBuffering handle LineBuffering
           return $ M.insert name handle handleMap
 
-        forkEvqAggregator handleMap =
+        forkNetHandlers handleMap =
           forM_ (M.assocs handleMap)
-            (\(net, handle) -> forkIO $ forever $ parseNetCon net handle evq)
+            (\(net, handle) -> doForever $ netHandler net handle evq)
 
-        forkActqHandler handleMap = forkIO $ forever $ handleAction handleMap
-        handleAction handleMap = do
-          act <- readAction actq
-          let net = actionToNet act
-          case M.lookup net handleMap of
-            Nothing -> printf "ERROR: no handle for net %s\n" net -- uhh....
-            Just h -> do
-              printf "handleAction: %s: sending <%s>\n" net (actionToMsg act)
-              sendAction h act
+        -- need more complicated handling of handleMap to get dynamic
+        -- network connections. needs to be changeable by main loop
+        -- and accessible by actionHandler.
+        forkActionHandler handleMap = doForever $ actionHandler handleMap actq
 
         initConnects handleMap =
           forM_ (M.keys handleMap) $ \net -> addAction actq (DoInit net me)
 
-parseNetCon :: NetName -> Handle -> EvQ -> IO ()
-parseNetCon net h evq = do
+-- from a network handle, parses lines into events and places them on
+-- the event queue
+netHandler :: NetName -> Handle -> EvQ -> IO ()
+netHandler net h evq = do
     line <- hGetLine h
-    printf "parseNetCon: %s: <%s>\n" net line
+    printf "parseNetCon: %s: <%s>\n" net $ dropNewlines line
     case IRC.decode line of
       Nothing -> putStrLn "parseNetCon failed a parse!" -- FIXME debug error
-      Just msg -> do
-        -- FIXME really need that hslogger stuff
-        --printf "     parse: IRCmsg: <%s>\n" (show msg)
-        --printf "     parse:  event: <%s>\n" (show event)
-        maybe (return ()) (writeEvent evq) (parseEvent net msg)
+      Just msg -> maybeIO (addEvent evq) (parseEvent net msg)
 
-sendAction :: Handle -> Action -> IO ()
-sendAction h act = hPutStr h $ actionToMsg act
+actionHandler :: Map NetName Handle -> ActQ -> IO ()
+actionHandler handleMap actq = do
+  act <- readAction actq
+  let net = actionToNet act
+  case M.lookup net handleMap of
+    Nothing -> error $ printf "no handle for net %s\n" net
+    Just h -> do
+      printf "handleAction: %s: sending <%s>\n" net (dropNewlines $ actionToMsg act)
+      sendActionToNet h act
+
+
+sendActionToNet :: Handle -> Action -> IO ()
+sendActionToNet h act = hPutStr h $ actionToMsg act
+
+startPlugins :: [Plugin] -> EvQ -> ActQ -> IO ()
+startPlugins plugs evq actq = forM_ plugs startPlug
+    where startPlug p = do
+            -- duplicate event queue so all plugins get all events
+            evq' <- dupEvq evq
+            forkIO $ runPlugin p evq' actq
+
+joinChans :: [Channel] -> ActQ -> IO ()
+joinChans chans actq = forM_ chans (\c -> addAction actq $ DoJoin c)
 
 runIrc :: Irc () -> IrcState -> IO ()
 runIrc irc initState = do

@@ -4,7 +4,9 @@ module Util (
   , calTimeString
   , getCalTime
   , breakOnSpace
+  , dropNewlines
   , delay
+  , doForever
   , eitherToMaybe
   , maybeIO
   , lookupExn
@@ -15,7 +17,8 @@ module Util (
   , safeIndex
 ) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (ThreadId, forkIO, threadDelay)
+import Control.Monad (forever)
 import Data.List (isPrefixOf)
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -47,8 +50,17 @@ appFst f (one, two) = (f one, two)
 breakOnSpace :: String -> (String, String)
 breakOnSpace = break (== ' ')
 
+dropNewlines :: String -> String
+dropNewlines = map nlToSpace
+  where nlToSpace '\n' = ' '
+        nlToSpace '\r' = ' '
+        nlToSpace c = c
+
 delay :: Int -> IO ()
 delay = threadDelay . (* 10^(6::Integer)) -- better way to do this typehint?
+
+doForever :: IO a -> IO ThreadId
+doForever = forkIO . forever
 
 eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe = either (const Nothing) Just
