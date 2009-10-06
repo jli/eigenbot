@@ -34,4 +34,3 @@ main = do
     debugM "eigenbot starting up"
     initState <- hardCodedState
     B.runBot initState
-    return ()

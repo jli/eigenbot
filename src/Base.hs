@@ -253,6 +253,7 @@ startPlugins plugs evq actq = forM_ plugs startPlug
 joinChans :: [Channel] -> ActQ -> IO ()
 joinChans chans actq = forM_ chans (\c -> addAction actq $ DoJoin c)
 
+-- should, like, clean up and wait on threads and stuff, somewhere
 runBot :: IrcState -> IO ()
 runBot initState = do
   runStateT setup initState
