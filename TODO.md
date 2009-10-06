@@ -11,16 +11,14 @@
 
 # Clean-up, Refactoring
 - More abstract plugin interface. Plugin monad? Currently *extremely* boilerplate-y.
-- Unify Event and Action types, and/or event and action queues(?).
 - Better parseEvent and actionToMsg. Use Parsec or something for parseEvent.
 - Plugin-related types are confusing.
 - Use hslogger instead of putStrLn/printf.
 
 # Flexibility, Expressiveness
-- Add timestamps to events(?).
 - Filtering abstraction to allow concise matching/filtering code.
 - Dynamic changes to runtime state (networks, channels, plugins). Needed for Command plugin.
-- Serializing, loading state(?).
+- Serializing, loading state.
 
 # Robustness
 - Auto-reconnect to networks on disconnect.
