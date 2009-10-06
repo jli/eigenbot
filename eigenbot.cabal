@@ -28,5 +28,6 @@ executable eigenbot
       , mtl
       , network
       , old-time
+      , random
       , tagsoup
       , template-haskell
