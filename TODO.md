@@ -1,6 +1,6 @@
 # Features
-- Command plugin: joining, parting, loading plugins, etc.
-- Github plugin: send message for each commit.
+- Github plugin. Handle per-channel subscriptions and subscription requests.
+- RSS plugin.
 - Quotes plugin: !quote command for saving quotes. Parsing of irssi-like output so people can paste entire lines(?). !quote lastmsgfrom nick to save last message(?).
 - Weather plugin: !weather and !forecast. Take a zip code?
 - Zippy plugin: spout madness upon seeing uppercase channel messages
@@ -17,8 +17,10 @@
 
 # Flexibility, Expressiveness
 - Filtering abstraction to allow concise matching/filtering code.
-- Dynamic changes to runtime state (networks, channels, plugins). Needed for Command plugin.
+- Dynamic network connections.
+- Dynamic plugin (un)loading
 - Serializing, loading state.
+- Per-network nicks. Dynamic nick changing.
 
 # Robustness
 - Auto-reconnect to networks on disconnect.
