@@ -10,9 +10,9 @@ import Data.Maybe (mapMaybe)
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (maybeIO)
+import Util (maybeIO, plural)
 
-type Points = Map B.Nick Int
+type Points = Map B.Nick Integer
 --type Reasons = Map B.Nick [String]
 --type KarmaState = (Points, Reasons)
 
@@ -90,7 +90,7 @@ nickPointsStr :: Points -> B.Nick -> String
 nickPointsStr points nick =
     case M.lookup nick points of
       Nothing -> printf "%s has 0 points" nick
-      Just p -> printf "%s has %d points" nick p
+      Just p -> printf "%s has %s" nick $ plural "point" p
 
 -- stringify entire points map. limit?
 showAll :: Points -> String

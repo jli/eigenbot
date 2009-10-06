@@ -3,6 +3,8 @@ module Util (
   , appFst
   , calTimeString
   , getCalTime
+  , plural
+  , generalPlural
   , breakOnSpace
   , dropNewlines
   , delay
@@ -44,6 +46,13 @@ calTimeString ct =
 
 getCalTime :: IO CalendarTime
 getCalTime = getClockTime >>= toCalendarTime
+
+generalPlural :: String -> String -> Integer -> String
+generalPlural one _many 1 = "1" +++ one
+generalPlural _one many n = show n +++ many
+
+plural :: String -> Integer -> String
+plural one n = generalPlural one (one++"s") n
 
 appFst :: (a -> z) -> (a, b) -> (z, b)
 appFst f (one, two) = (f one, two)
