@@ -1,6 +1,6 @@
 module Plugins.Karma (plugin) where
 
-import Control.Monad (forM_, mplus)
+import Control.Monad (mplus)
 import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
 import Data.List (nub)
@@ -10,6 +10,7 @@ import Data.Maybe (mapMaybe)
 import Text.Printf (printf)
 
 import qualified Base as B
+import Util (maybeIO)
 
 type Points = Map B.Nick Int
 --type Reasons = Map B.Nick [String]
@@ -74,12 +75,16 @@ updateAndSay say strs = do
     let updates = mapMaybe scoreNick strs
         changed = nub $ map nickOfUpdate updates
         newPoints = foldr updatePoints oldPoints updates
-    liftIO $ announce newPoints changed
+    liftIO $ maybeIO say (announce newPoints changed)
     put newPoints
   where updatePoints (Up nick) = M.insertWith' (+) nick (1)
         updatePoints (Down nick) = M.insertWith' (+) nick (-1)
+        announce _points [] = Nothing
         announce points nicks =
-          forM_ nicks $ (\n -> say $ nickPointsStr points n)
+         let changeStrs = map (\n -> nickPointsStr points n) nicks in
+         Just $ foldr buildString "" changeStrs
+        buildString str "" = str ++ "."
+        buildString str rest = str ++ ". " ++ rest
 
 nickPointsStr :: Points -> B.Nick -> String
 nickPointsStr points nick =
