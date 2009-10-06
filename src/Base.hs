@@ -56,7 +56,7 @@ data Net = Net NetName [Srv]
 data Event = Join Channel Nick
            | Part Channel Nick String
            | ChannelMsg Channel Nick String
-           | PrivMsg NetName Nick String
+           | PrivMsg NetName Nick String -- nick is sending user
            | Ping NetName String
              deriving (Show)
 
@@ -170,7 +170,7 @@ parseEvent net (IRC.Message (Just (IRC.NickName nick _user _server)) cmd params)
         let toPart = params !! 0
             rest = unwords $ drop 1 params in
         if isMe toPart
-        then Just $ PrivMsg net toPart rest
+        then Just $ PrivMsg net nick rest
         else Just $ ChannelMsg (Channel net toPart) nick rest
       _ -> Nothing
 parseEvent _net (IRC.Message (Just (IRC.Server _name)) _ _) = Nothing
