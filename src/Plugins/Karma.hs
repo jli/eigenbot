@@ -83,8 +83,8 @@ updateAndSay say strs = do
         announce points nicks =
          let changeStrs = map (\n -> nickPointsStr points n) nicks in
          Just $ foldr buildString "" changeStrs
-        buildString str "" = str ++ "."
-        buildString str rest = str ++ ". " ++ rest
+        buildString str "" = str
+        buildString str rest = str ++ ", " ++ rest
 
 nickPointsStr :: Points -> B.Nick -> String
 nickPointsStr points nick =
