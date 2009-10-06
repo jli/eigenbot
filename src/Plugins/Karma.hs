@@ -1,8 +1,9 @@
 module Plugins.Karma (plugin) where
 
-import Control.Monad (mplus)
+import Control.Monad (forM_, mplus)
 import Control.Monad.Trans (liftIO)
-import Control.Monad.State.Strict (get, modify)
+import Control.Monad.State.Strict (get, put)
+import Data.List (nub)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
@@ -26,6 +27,10 @@ plugin = B.genPlugin
 data Update = Up B.Nick
             | Down B.Nick
 
+nickOfUpdate :: Update -> B.Nick
+nickOfUpdate (Up n) = n
+nickOfUpdate (Down n) = n
+
 scoreNickPre, scoreNick :: String -> Maybe Update
 scoreNickPre ('+':'+':[]) = Nothing
 scoreNickPre ('-':'-':[]) = Nothing
@@ -41,29 +46,50 @@ scoreNick word = scoreNickPre word `mplus` maybeReversed
   where maybeReversed =
           fmap reverseUpdate (scoreNickPre $ reverse word)
 
+-- FIXME make standard?
+type SayFun = String -> IO ()
+
 loop :: B.PluginLoop Points
 loop evq actq = do
     ev <- liftIO $ B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> handleChanMsg chan nick msg
       _ -> return ()
-  where handleChanMsg chan _sendNick msg =
+  where handleChanMsg chan _sendingNick msg =
+          let say = B.say actq chan in
           case words msg of
-            "!karma":nick:_ -> printPoints chan nick
-            rest -> update rest msg
-        printPoints chan nick = do
-            points <- get
-            let reply = case M.lookup nick points of
-                          Nothing -> printf "%s has 0 points" nick
-                          Just p -> printf "%s has %d points" nick p
-            liftIO $ B.say actq chan reply
-        update msgWords _origMsg =
-            updatePoints $ mapMaybe scoreNick msgWords
+            "!karma":nick:_ -> printPoints say nick
+            ["!karma"] -> printAll say
+            rest -> updateAndSay say rest
+        printPoints say nick = do
+          points <- get
+          liftIO $ say $ nickPointsStr points nick
+        printAll say = do
+          points <- get
+          liftIO $ say $ showAll points
 
-updatePoints :: [Update] -> B.PluginStateT Points
-updatePoints updates =
-    modify (\points -> foldr updateMap points updates)
-  where updateMap (Up nick) origPoints =
-            M.insertWith' (+) nick 1 origPoints
-        updateMap (Down nick) origPoints =
-            M.insertWith' (+) nick (-1) origPoints
+updateAndSay :: SayFun -> [String] -> B.PluginStateT Points
+updateAndSay say strs = do
+    oldPoints <- get
+    let updates = mapMaybe scoreNick strs
+        changed = nub $ map nickOfUpdate updates
+        newPoints = foldr updatePoints oldPoints updates
+    liftIO $ announce newPoints changed
+    put newPoints
+  where updatePoints (Up nick) = M.insertWith' (+) nick (1)
+        updatePoints (Down nick) = M.insertWith' (+) nick (-1)
+        announce points nicks =
+          forM_ nicks $ (\n -> say $ nickPointsStr points n)
+
+nickPointsStr :: Points -> B.Nick -> String
+nickPointsStr points nick =
+    case M.lookup nick points of
+      Nothing -> printf "%s has 0 points" nick
+      Just p -> printf "%s has %d points" nick p
+
+-- stringify entire points map. limit?
+showAll :: Points -> String
+showAll points =
+    foldr buildString "" $ M.toList points
+  where buildString (n, p) "" = printf "%s %d" n p
+        buildString (n, p) str = printf "%s %d, " n p ++ str
