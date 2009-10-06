@@ -7,6 +7,7 @@ module Util (
   , delay
   , eitherToMaybe
   , maybeIO
+  , lookupExn
   , getUrl
   , headUrl
   , probablyUrl
@@ -15,6 +16,9 @@ module Util (
 
 import Control.Concurrent (threadDelay)
 import Data.List (isPrefixOf)
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Maybe (fromJust)
 import Network.Browser (browse, setAllowRedirects, setMaxRedirects, request)
 import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 import Network.HTTP.Base (Response(..), Request(..), RequestMethod(..))
@@ -50,6 +54,9 @@ eitherToMaybe = either (const Nothing) Just
 
 maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
 maybeIO f m = maybe (return ()) f m
+
+lookupExn :: Ord a => a -> Map a b -> b
+lookupExn k m = fromJust $ M.lookup k m
 
 -- must be a better way, but example in Network.Browser docs no longer worked
 fetchUrl :: String -> RequestMethod -> IO (Response String)
