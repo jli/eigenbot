@@ -90,6 +90,8 @@ nickPointsStr points nick =
 -- stringify entire points map. limit?
 showAll :: Points -> String
 showAll points =
-    foldr buildString "" $ M.toList points
+    case M.toList points of
+      [] -> "No one has any points!"
+      list -> foldr buildString "" list
   where buildString (n, p) "" = printf "%s %d" n p
         buildString (n, p) str = printf "%s %d, " n p ++ str
