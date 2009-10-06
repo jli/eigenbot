@@ -5,8 +5,7 @@ module Base (
   , readEvent
   , say
   , pm
-  , runIrc
-  , setup
+  , runBot
   , newActq
   , newEvq
   , ActQ
@@ -17,12 +16,12 @@ module Base (
   , PluginStateT
   , PluginLoop
   , genPlugin
+  , Nick
   , Net (..)
   , Srv (..)
   , Channel (..)
-  , Nick
-  , ChannelName
   , NetName
+  , ChannelName
 ) where
 
 import Control.Concurrent (forkIO)
@@ -254,7 +253,7 @@ startPlugins plugs evq actq = forM_ plugs startPlug
 joinChans :: [Channel] -> ActQ -> IO ()
 joinChans chans actq = forM_ chans (\c -> addAction actq $ DoJoin c)
 
-runIrc :: Irc () -> IrcState -> IO ()
-runIrc irc initState = do
-  runStateT irc initState
+runBot :: IrcState -> IO ()
+runBot initState = do
+  runStateT setup initState
   return ()

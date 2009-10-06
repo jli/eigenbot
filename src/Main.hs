@@ -33,5 +33,5 @@ main = do
     HSL.updateGlobalLogger "" (HSL.setLevel HSL.DEBUG)
     debugM "eigenbot starting up"
     initState <- hardCodedState
-    B.runIrc B.setup initState
+    B.runBot initState
     return ()
