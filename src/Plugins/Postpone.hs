@@ -9,7 +9,7 @@ import System.Time (CalendarTime)
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (calTimeString, getCalTime)
+import Util (calTimeString, getCalTime, insertAppend)
 
 data MsgKey = MsgKey B.Channel B.Nick
               deriving (Eq, Ord)
@@ -43,7 +43,7 @@ loop evq actq = do
               time <- liftIO getCalTime
               let saved = SM nick user (unwords rest) time
                   key = MsgKey chan user
-              put $ M.insertWith' (++) key [saved] saveMap
+              put $ insertAppend key saved saveMap
               liftIO $ B.say actq chan (printf "message for %s saved" user)
           _ -> return ()
       B.Join chan nick ->

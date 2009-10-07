@@ -13,6 +13,8 @@ module Util (
   , eitherToMaybe
   , maybeIO
   , lookupExn
+  , insertCons
+  , insertAppend
   , getUrl
   , headUrl
   , probablyUrl
@@ -81,8 +83,14 @@ eitherToMaybe = either (const Nothing) Just
 maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
 maybeIO f m = maybe (return ()) f m
 
-lookupExn :: Ord a => a -> Map a b -> b
+lookupExn :: Ord k => k -> Map k v -> v
 lookupExn k m = fromJust $ M.lookup k m
+
+insertCons :: Ord k => k -> v -> Map k [v] -> Map k [v]
+insertCons k v = M.insertWith' (++) k [v]
+
+insertAppend :: Ord k => k -> v -> Map k [v] -> Map k [v]
+insertAppend k v = M.insertWith' (flip (++)) k [v]
 
 -- must be a better way, but example in Network.Browser docs no longer worked
 fetchUrl :: String -> RequestMethod -> IO (Response String)
