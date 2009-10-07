@@ -9,8 +9,9 @@ module Util (
   , dropNewlines
   , delay
   , doForever
-  , coin
+  , mcoin
   , eitherToMaybe
+  , io
   , maybeIO
   , lookupExn
   , insertCons
@@ -24,6 +25,7 @@ module Util (
 
 import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Monad (forever)
+import Control.Monad.Trans (MonadIO, liftIO)
 import Data.List (isPrefixOf)
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -74,14 +76,17 @@ delay = threadDelay . (* 10^(6::Integer)) -- better way to do this typehint?
 doForever :: IO a -> IO ThreadId
 doForever = forkIO . forever
 
-coin :: Monad m => m ()
-coin = return ()
+mcoin :: Monad m => m ()
+mcoin = return ()
 
 eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe = either (const Nothing) Just
 
+io :: MonadIO m => IO a -> m a
+io = liftIO
+
 maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
-maybeIO f m = maybe (return ()) f m
+maybeIO f m = maybe (mcoin) f m
 
 lookupExn :: Ord k => k -> Map k v -> v
 lookupExn k m = fromJust $ M.lookup k m

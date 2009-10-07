@@ -1,6 +1,5 @@
 module Plugins.Simple (plugin) where
 
-import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
 import Data.List (find, isPrefixOf, isSuffixOf)
 import Data.Maybe (fromJust, isJust)
@@ -9,7 +8,7 @@ import System.Random (StdGen, next, mkStdGen)
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (breakOnSpace, safeIndex)
+import Util (io, mcoin, breakOnSpace, safeIndex)
 
 type RandState = StdGen
 
@@ -21,13 +20,13 @@ plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop initState
 
 loop :: B.PluginLoop RandState
 loop evq actq = do
-    ev <- liftIO $ B.readEvent evq
+    ev <- io $ B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> handleChanMsg chan nick msg
-      _ -> return ()
+      _ -> mcoin
   where handleChanMsg chan nick msg =
           let (cmd, rest) = breakOnSpace msg
-              say = liftIO . B.say actq chan in
+              say = io . B.say actq chan in
           case cmd of
             "!id" -> say $ printf "%s said:%s" nick rest
             "!tell" ->
@@ -35,11 +34,11 @@ loop evq actq = do
                 [] -> say $ printf "TRYING TO PICK A FIGHT %s YO!" nick
                 [user] -> say $ printf "hey %s, THE WORLD IS A VAMPIRE" user
                 user:rest' -> say $ printf "hey %s, %s" user $ unwords rest'
-            "!date" -> liftIO getClockTime >>= say . printf "date is: %s" . show
+            "!date" -> io getClockTime >>= say . printf "date is: %s" . show
             _ -> do
               gen <- get
               case cuteness nick msg gen of
-                Nothing -> return ()
+                Nothing -> mcoin
                 Just (cuteMsg, gen') -> do
                   say cuteMsg
                   put gen'

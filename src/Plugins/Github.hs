@@ -10,7 +10,6 @@
 module Plugins.Github (plugin) where
 
 import Control.Monad (foldM, forM_, mapM_, when)
-import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -22,7 +21,7 @@ import Text.Feed.Types (Feed(..))
 import qualified Text.Atom.Feed as Atom
 
 import qualified Base as B
-import Util (delay, simpleHttp)
+import Util (io, delay, simpleHttp)
 
 type User = String
 type Project = String
@@ -71,10 +70,10 @@ plugin = B.genPlugin
 loop :: B.PluginLoop GithubState
 loop _evq actq = do
     St subscribed justStarted commits <- get
-    newCommits <- liftIO $ fetchAll subscribed
-    liftIO $ when (not justStarted) $ announceNew actq newCommits commits
+    newCommits <- io $ fetchAll subscribed
+    io $ when (not justStarted) $ announceNew actq newCommits commits
     put $ St subscribed False newCommits
-    liftIO $ delay 300 -- make configurable
+    io $ delay 300 -- make configurable
 
 fetchAll :: [Repo] -> IO (RepoCommits)
 fetchAll repos =

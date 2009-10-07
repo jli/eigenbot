@@ -27,7 +27,6 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan, dupChan)
 import Control.Monad (forever, forM_, foldM, liftM, liftM2)
 import Control.Monad.State.Strict (StateT, runStateT, get, put)
-import Control.Monad.Trans (liftIO)
 import Data.Map (Map)
 import qualified Data.Map as M
 import System.Exit (exitWith, ExitCode(..))
@@ -38,7 +37,7 @@ import qualified Network.IRC.Base as IRC
 import qualified Network.IRC.Parser as IRC
 import Network (PortID(..), PortNumber, connectTo)
 
-import Util((+++), doForever, coin, dropNewlines, maybeIO)
+import Util((+++), io, doForever, mcoin, dropNewlines, maybeIO)
 
 
 type Nick = String
@@ -103,7 +102,7 @@ genPlugin description loop initState =
     \evq actq -> do
        printf "plugin starting: %s\n" description
        runStateT (forever $ loop evq actq) initState
-       return ()
+       mcoin
 
 runPlugin :: Plugin -> EvQ -> ActQ -> IO ()
 runPlugin plug evq actq = plug evq actq
@@ -215,7 +214,7 @@ runBot :: BotConfig -> IO ()
 runBot config = do
     initState <- configToInitState config
     runStateT setup initState
-    return ()
+    mcoin
 
 configToInitState :: BotConfig -> IO IrcState
 configToInitState (BotConfig nets chans roots plugins) =
@@ -229,20 +228,20 @@ configToInitState (BotConfig nets chans roots plugins) =
 -- need to move comments from here to some fancy architecture overview
 setup :: Irc ()
 setup = do
-    liftIO $ putStrLn "begin setup"
+    io $ putStrLn "begin setup"
     -- called with state derived from BotConfig, so inNets and inChans
     -- will be empty
     st@(IS [] [] reqNets reqChans _roots plugins evq actq) <- get
     -- hook up incoming events to evq through network parser, start
     -- actq handler for dispatching actions to networks
-    liftIO $ putStrLn "connect nets"
-    inNets <- liftIO $ connectNets reqNets evq actq
+    io $ putStrLn "connect nets"
+    inNets <- io $ connectNets reqNets evq actq
     -- all plugins get all events
-    liftIO $ startPlugins plugins evq actq
-    inChans <- liftIO $ joinChans reqChans actq
+    io $ startPlugins plugins evq actq
+    inChans <- io $ joinChans reqChans actq
     put $ st { stInNets = inNets, stInChannels = inChans
              , stReqNets = [], stReqChannels = [] }
-    liftIO $ putStrLn "enter listen loop"
+    io $ putStrLn "enter listen loop"
     forever $ mainLoop
 
 -- main loop that controls IRC state. ultimately, would like to be
@@ -257,8 +256,8 @@ mainLoop = do
 handleNewRequests :: Irc ()
 handleNewRequests = do
     st@(IS inNets inChans reqNets reqChans _roots _plugins _evq actq) <- get
-    (reqNets', newNets) <- liftIO $ connectNewNets actq reqNets
-    (reqChans', newChans) <- liftIO $ joinNewChans actq reqChans
+    (reqNets', newNets) <- io $ connectNewNets actq reqNets
+    (reqChans', newChans) <- io $ joinNewChans actq reqChans
     put $ st { stInNets = inNets ++ newNets
              , stInChannels = inChans ++ newChans
              , stReqNets = reqNets'
@@ -274,16 +273,16 @@ handleNewRequests = do
 handleEvent :: Irc ()
 handleEvent = do
     IS _inNets _inChans _reqNets _reqChans roots _plugins evq actq <- get
-    ev <- liftIO $ readEvent evq
+    ev <- io $ readEvent evq
     case ev of
-      Ping net msg -> liftIO $ pong actq net msg
-      Join _chan _nick -> coin
-      Part _chan _nick _msg -> coin
-      ChannelMsg _chan _nick _msg -> coin -- leave to the plugins
+      Ping net msg -> io $ pong actq net msg
+      Join _chan _nick -> mcoin
+      Part _chan _nick _msg -> mcoin
+      ChannelMsg _chan _nick _msg -> mcoin -- leave to the plugins
       PrivMsg net nick msg ->
         if isRoot roots net nick
         then controller net nick msg
-        else liftIO $ putStrLn "privmsg but NOT FROM A ROOT!"
+        else io $ putStrLn "privmsg but NOT FROM A ROOT!"
 
 controller :: NetName -> Nick -> String -> Irc ()
 controller net nick msg = do
@@ -291,23 +290,23 @@ controller net nick msg = do
     let reply = pm actq net nick
     case words msg of
       ["!join", chan] -> do
-        liftIO $ reply "adding to requested channels"
+        io $ reply "adding to requested channels"
         put $ st { stReqChannels = (Channel net chan) : reqChans }
       ["!part", chan] ->
-        liftIO $ do reply "leaving now..."
-                    part actq (Channel net chan) "PUPPETS SAY YES"
+        io $ do reply "leaving now..."
+                part actq (Channel net chan) "PUPPETS SAY YES"
       "!say":chan:rest ->
-        liftIO $ do reply "saying..."
-                    say actq (Channel net chan) $ unwords rest
+        io $ do reply "saying..."
+                say actq (Channel net chan) $ unwords rest
       "!pm":dstNick:rest ->
-        liftIO $ do reply "pming..."
-                    pm actq net dstNick $ unwords rest
+        io $ do reply "pming..."
+                pm actq net dstNick $ unwords rest
       ["!die"] ->
         -- HANDLE STATE SERIALIZATION
-        liftIO $ do reply "dying!!!"
-                    exitWith ExitSuccess
+        io $ do reply "dying!!!"
+                exitWith ExitSuccess
       _ ->
-        liftIO $ reply "didn't understand that! !join, !part, !say, !pm, !die"
+        io $ reply "didn't understand that! !join, !part, !say, !pm, !die"
 
 
 isRoot :: RootMap -> NetName -> Nick -> Bool

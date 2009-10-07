@@ -1,7 +1,6 @@
 module Plugins.Karma (plugin) where
 
 import Control.Monad (mplus)
-import Control.Monad.Trans (liftIO)
 import Control.Monad.State.Strict (get, put)
 import Data.List (nub)
 import Data.Map (Map)
@@ -10,7 +9,7 @@ import Data.Maybe (mapMaybe)
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (maybeIO, plural)
+import Util (io, mcoin, maybeIO, plural)
 
 type Points = Map B.Nick Integer
 --type Reasons = Map B.Nick [String]
@@ -52,10 +51,10 @@ type SayFun = String -> IO ()
 
 loop :: B.PluginLoop Points
 loop evq actq = do
-    ev <- liftIO $ B.readEvent evq
+    ev <- io $ B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> handleChanMsg chan nick msg
-      _ -> return ()
+      _ -> mcoin
   where handleChanMsg chan _sendingNick msg =
           let say = B.say actq chan in
           case words msg of
@@ -64,10 +63,10 @@ loop evq actq = do
             rest -> updateAndSay say rest
         printPoints say nick = do
           points <- get
-          liftIO $ say $ nickPointsStr points nick
+          io $ say $ nickPointsStr points nick
         printAll say = do
           points <- get
-          liftIO $ say $ showAll points
+          io $ say $ showAll points
 
 updateAndSay :: SayFun -> [String] -> B.PluginStateT Points
 updateAndSay say strs = do
@@ -75,7 +74,7 @@ updateAndSay say strs = do
     let updates = mapMaybe scoreNick strs
         changed = nub $ map nickOfUpdate updates
         newPoints = foldr updatePoints oldPoints updates
-    liftIO $ maybeIO say (announce newPoints changed)
+    io $ maybeIO say (announce newPoints changed)
     put newPoints
   where updatePoints (Up nick) = M.insertWith' (+) nick (1)
         updatePoints (Down nick) = M.insertWith' (+) nick (-1)
