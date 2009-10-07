@@ -74,7 +74,7 @@ loop _evq actq = do
     newCommits <- io $ fetchAll subscribed
     io $ when (not justStarted) $ announceNew actq newCommits commits
     put $ St subscribed False newCommits
-    io $ delay 300 -- make configurable
+    io $ delay 120 -- make configurable
 
 fetchAll :: [Repo] -> IO (RepoCommits)
 fetchAll repos =
@@ -92,6 +92,7 @@ parseAtomString s =
       Just (AtomFeed f) -> Just f
       _ -> Nothing
 
+-- don't use fromJust!!! Maybe [Commit]!!!
 pageToCommits :: String -> [Commit]
 pageToCommits = map entryToCommit . Atom.feedEntries . fromJust . parseAtomString
 
@@ -108,8 +109,8 @@ announceNew actq newMap oldMap = mapM_ announce newCommits
         announce (repo, newC) =
             forM_ (reverse newC)
               (\n -> toChan $ printf "new on %s: %s" (show repo) (show n))
-        toChan = B.pm actq "sigil" "jli"
-        --toChan = B.say actq (B.Channel "sigil" "#z")
+        --toChan = B.pm actq "sigil" "jli"
+        toChan = B.say actq (B.Channel "sigil" "#z")
 
 -- 'dropOld keepFn old new' applies keepFn with the first entry of old
 -- to all the entries of new, continuing until keepFn returns false.
