@@ -16,8 +16,8 @@ $(deriveLoggers "HSL" [HSL.DEBUG])
 
 hardCodedState :: B.BotConfig
 hardCodedState = B.BotConfig nets chans roots plugs
-  where nets = [ B.Net "sigil" [B.Srv "sigil.yi.org" 56667]
-               , B.Net "freenode" [B.Srv "irc.freenode.net" 6667]]
+  where nets = [ B.Net "sigil" [B.Srv "sigil.yi.org" 56667] ]
+               --, B.Net "freenode" [B.Srv "irc.freenode.net" 6667]]
         chans = [ B.Channel "sigil" "#t"
                 , B.Channel "sigil" "#z"]
         roots = fromList [("sigil", ["jli"]), ("freenode", ["jli"])]
