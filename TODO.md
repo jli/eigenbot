@@ -26,3 +26,4 @@
 - Auto-reconnect to networks on disconnect.
 - Fall back on other servers for given network.
 - Try different nick when taken.
+- Reloading - core and plugins. How does xmonad do it?
