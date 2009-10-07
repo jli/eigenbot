@@ -11,9 +11,10 @@ module Plugins.Github (plugin) where
 
 import Control.Monad (foldM, forM_, mapM_, when)
 import Control.Monad.State.Strict (get, put)
+import Data.Function (on)
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, listToMaybe)
 import Text.Printf (printf)
 
 import Text.Feed.Import (parseFeedString)
@@ -36,9 +37,9 @@ instance Show Repo where
 type RepoCommits = Map Repo [Commit]
 
 data Commit = Commit {
-      cTitle :: String
+      _cTitle :: String
     , _cAuthor :: String
-    , _cTime :: String
+    , cTime :: String
 }
 
 instance Show Commit where
@@ -100,17 +101,25 @@ entryToCommit entry = Commit title author time
         time = Atom.entryUpdated entry
         title = Atom.txtToString $ Atom.entryTitle entry
 
--- FIXME dense and ugly
 announceNew :: B.ActQ -> RepoCommits -> RepoCommits -> IO ()
 announceNew actq newMap oldMap = mapM_ announce newCommits
-  where newCommits = M.toList $ foldr removeOld newMap (M.toList oldMap)
-        removeOld (repo, oldCommits) curMap =
-            let newestOld = cTitle $ head oldCommits  -- be safer
-                cur = fromJust $ M.lookup repo curMap
-                keepNew = takeWhile ((/= newestOld) . cTitle) cur
-            in M.insert repo keepNew curMap
+  where newCommits = M.toList $ dropOld diffCtime oldMap newMap
+        diffCtime = (/=) `on` cTime
         announce (repo, newC) =
             forM_ (reverse newC)
-              (\n -> toZ $ printf "new on %s: %s" (show repo) (show n))
-        --toJli = B.pm actq "sigil" "jli"
-        toZ = B.say actq (B.Channel "sigil" "#z")
+              (\n -> toChan $ printf "new on %s: %s" (show repo) (show n))
+        toChan = B.pm actq "sigil" "jli"
+        --toChan = B.say actq (B.Channel "sigil" "#z")
+
+-- 'dropOld keepFn old new' applies keepFn with the first entry of old
+-- to all the entries of new, continuing until keepFn returns false.
+-- This means items closer to the front of the list are considered
+-- "newer".
+dropOld :: Ord k => (v -> v -> Bool) -> Map k [v] -> Map k [v] -> Map k [v]
+dropOld keepFn oldMap newMap = foldr removeOld newMap (M.toList oldMap)
+  where removeOld (repo, oldCommits) current =
+          case (do lastOld <- listToMaybe oldCommits
+                   allNew <- M.lookup repo current
+                   return $ takeWhile (keepFn lastOld) allNew) of
+            Nothing -> current
+            Just reallyNew -> M.insert repo reallyNew current
