@@ -8,7 +8,7 @@ import Control.Concurrent (forkIO)
 import Control.Exception (SomeException, try)
 import Control.Monad (mapM_)
 import Data.List (find, isPrefixOf)
-import Data.Maybe (fromJust, isJust, isNothing, listToMaybe)
+import Data.Maybe (fromJust, isJust, listToMaybe)
 
 import Network.HTTP.Headers (Header(..), HeaderName(..))
 import Text.HTML.TagSoup (Tag(..), sections, (~==))
@@ -31,31 +31,44 @@ parseAndAnnounce :: B.ActQ -> B.Channel -> [String] -> B.PluginStateT ()
 parseAndAnnounce actq chan strs =
     io $ mapM_ (forkIO . announceMaybe) $ filter probablyUrl strs
   where announceMaybe url = do
-          maybeTitle <- getTitle url
+          maybeTitle <- getCleanTitle url
           maybeIO sayTitle maybeTitle
         sayTitle = B.say actq chan . ("title: " ++ )
 
+-- hmm, make this more expansive? \n\r case found here:
+-- http://www.cityofgainesville.org/tabid/156/Default.aspx
+cleanTitle :: String -> String
+cleanTitle = filter (not . lineEnding)
+  where lineEnding = (`elem` ['\n', '\r'])
+
+getCleanTitle :: String -> IO (Maybe String)
+getCleanTitle url = getTitle url >>= return . (fmap cleanTitle)
+
+-- checks that the URL is "safe" to get
 getTitle :: String -> IO (Maybe String)
 getTitle url = do
     okay <- okayToGet url
     case okay of
       False -> return Nothing
-      True -> do
-        e <- try $ getUrl url :: IO (Either SomeException String)
-        return (eitherToMaybe e >>=
-                listToMaybe . sections (~== "<title>") . parseTags >>=
-                fromTitle)
+      True -> getTitle' url
+
+getTitle' :: String -> IO (Maybe String)
+getTitle' url = do
+    e <- try $ getUrl url :: IO (Either SomeException String)
+    return (eitherToMaybe e >>=
+            listToMaybe . sections (~== "<title>") . parseTags >>=
+            fromTitle)
   where fromTitle ((TagOpen "title" []) : (TagText t) : _) = Just t
         fromTitle _ = Nothing
 
 okayToGet :: String -> IO Bool
 okayToGet url = headUrl url >>= return . headersOkay
 
--- Always require Content-Type to exist and start with "text". If
--- Content-Length exists, limit it to 1mb.
+-- FIXME: wrap read for safety
+-- Okay if either Content-Type starts with "text" or if Content-Length < 1mb
 headersOkay :: [Header] -> Bool
-headersOkay hs = lengthOkay && contentOkay
-  where lengthOkay = isNothing len || (read (fromJust len) :: Integer) < oneMb
+headersOkay hs = lengthOkay || contentOkay
+  where lengthOkay = isJust len && (read (fromJust len) :: Integer) < oneMb
         contentOkay = isJust content && "text" `isPrefixOf` fromJust content
         oneMb = 10^(6::Integer)
         len = getHdr HdrContentLength hs
