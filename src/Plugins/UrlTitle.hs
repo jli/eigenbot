@@ -64,6 +64,8 @@ getTitle' url = do
 okayToGet :: String -> IO Bool
 okayToGet url = headUrl url >>= return . headersOkay
 
+-- bugz:
+-- http://www.eng.uwaterloo.ca/~aavogt/xmonad/docs/XMonad-Actions-TopicSpace.html
 -- FIXME: wrap read for safety
 -- Okay if either Content-Type starts with "text" or if Content-Length < 1mb
 headersOkay :: [Header] -> Bool
