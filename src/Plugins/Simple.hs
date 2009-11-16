@@ -10,7 +10,7 @@ import qualified Base as B
 import Util (io, mcoin, breakOnSpace, safeIndex)
 
 plugin :: B.Plugin
-plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop ()
+plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop () Nothing
 
 loop :: B.PluginLoop ()
 loop evq actq = do

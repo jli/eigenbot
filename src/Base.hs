@@ -1,5 +1,8 @@
+{-# LANGUAGE Rank2Types #-}
+
 module Base (
     me
+  , dotDir
   , addAction
   , readEvent
   , say
@@ -29,8 +32,11 @@ import Control.Monad (forever, forM_, foldM, liftM, liftM2)
 import Control.Monad.State.Strict (StateT, runStateT, get, put)
 import Data.Map (Map)
 import qualified Data.Map as M
+import System.Directory (createDirectoryIfMissing, doesFileExist, getHomeDirectory)
 import System.Exit (exitWith, ExitCode(..))
+import System.FilePath ((</>))
 import System.IO (Handle, hGetLine, hPutStr, hSetBuffering, BufferMode (..))
+import System.IO.Unsafe (unsafePerformIO)
 import Text.Printf (printf)
 
 import qualified Network.IRC.Base as IRC
@@ -48,7 +54,7 @@ type RootMap = Map NetName [Nick]
 
 data Srv = Srv SrvName PortNumber
 data Channel = Channel NetName ChannelName
-             deriving (Eq, Ord, Show)
+             deriving (Eq, Ord, Read, Show)
 -- has enough data to allow connections. multiple servers allow
 -- redundant connections
 data Net = Net NetName [Srv]
@@ -66,6 +72,10 @@ data Action = DoJoin Channel
             | DoPrivMsg NetName Nick String
             | DoInit NetName Nick
             | DoPong NetName String
+
+-- Father forgive me
+dotDir :: FilePath
+dotDir = unsafePerformIO $ (</> ".eigenbot") `liftM` getHomeDirectory
 
 -- action and event queues
 newtype EvQ = EvQ (Chan Event)
@@ -94,14 +104,22 @@ dupEvq (EvQ c) = return . EvQ =<< dupChan c
 
 -- kind of gross
 type PluginStateT s = StateT s IO ()
-type PluginLoop s = EvQ -> ActQ -> PluginStateT s
+type PluginLoop s = (Read s) => EvQ -> ActQ -> PluginStateT s
 type Plugin = EvQ -> ActQ -> IO ()
 
-genPlugin :: String -> PluginLoop s -> s -> Plugin
-genPlugin description loop initState =
+-- messy. FilePath is location of saved state, if any
+genPlugin :: (Read s) => String -> PluginLoop s -> s -> Maybe FilePath -> Plugin
+genPlugin description loop initState savedFile =
     \evq actq -> do
        printf "plugin starting: %s\n" description
-       runStateT (forever $ loop evq actq) initState
+       state <- case savedFile of
+                  Nothing -> return initState
+                  Just f -> do
+                    exists <- doesFileExist f
+                    if exists
+                      then read `liftM` readFile f
+                      else return initState
+       runStateT (forever $ loop evq actq) state
        mcoin
 
 runPlugin :: Plugin -> EvQ -> ActQ -> IO ()
@@ -229,6 +247,7 @@ configToInitState (BotConfig nets chans roots plugins) =
 setup :: Irc ()
 setup = do
     io $ putStrLn "begin setup"
+    io $ setupDirs
     -- called with state derived from BotConfig, so inNets and inChans
     -- will be empty
     st@(IS [] [] reqNets reqChans _roots plugins evq actq) <- get
@@ -243,6 +262,7 @@ setup = do
              , stReqNets = [], stReqChannels = [] }
     io $ putStrLn "enter listen loop"
     forever $ mainLoop
+  where setupDirs = createDirectoryIfMissing True dotDir
 
 -- main loop that controls IRC state. ultimately, would like to be
 -- able to control all aspects of behavior (network connections,

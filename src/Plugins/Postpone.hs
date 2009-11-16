@@ -11,7 +11,7 @@ import qualified Base as B
 import Util (io, mcoin, calTimeString, getCalTime, insertAppend)
 
 data MsgKey = MsgKey B.Channel B.Nick
-              deriving (Eq, Ord)
+              deriving (Eq, Ord, Read)
 
 type PluginState = Map MsgKey [SavedMsg]
 
@@ -20,7 +20,7 @@ data SavedMsg = SM {
     , _smTo :: B.Nick
     , _smMsg :: String
     , _smDate :: CalendarTime
-}
+} deriving (Read)
 
 initState :: PluginState
 initState = M.empty
@@ -30,6 +30,7 @@ plugin = B.genPlugin
            "postpone plugin: ![postpone|pp] <user> <msg>"
            loop
            initState
+           Nothing
 
 loop :: B.PluginLoop PluginState
 loop evq actq = do

@@ -18,7 +18,7 @@ import qualified Base as B
 import Util (io, mcoin, getUrl, headUrl, probablyUrl, maybeIO, eitherToMaybe)
 
 plugin :: B.Plugin
-plugin = B.genPlugin "urltitle: fetches titles" loop ()
+plugin = B.genPlugin "urltitle: fetches titles" loop () Nothing
 
 loop :: B.PluginLoop ()
 loop evq actq = do

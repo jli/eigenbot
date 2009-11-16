@@ -6,6 +6,7 @@ import Data.List (nub)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
+import System.FilePath ((</>))
 import Text.Printf (printf)
 
 import qualified Base as B
@@ -18,11 +19,15 @@ type Points = Map B.Nick Integer
 initState :: Points
 initState = M.empty
 
+stateFile :: FilePath
+stateFile = B.dotDir </> "karma.state"
+
 plugin :: B.Plugin
 plugin = B.genPlugin
            "karma: !karma nick, !recent nick"
            loop
            initState
+           (Just stateFile)
 
 data Update = Up B.Nick
             | Down B.Nick
@@ -54,6 +59,7 @@ loop evq actq = do
     ev <- io $ B.readEvent evq
     case ev of
       B.ChannelMsg chan nick msg -> handleChanMsg chan nick msg
+      B.PrivMsg net nick msg -> handlePrivMsg net nick msg
       _ -> mcoin
   where handleChanMsg chan _sendingNick msg =
           let say = B.say actq chan in
@@ -67,6 +73,14 @@ loop evq actq = do
         printAll say = do
           points <- get
           io $ say $ showAll points
+        handlePrivMsg _net _nick msg =
+          -- no isRoot check on nick. rootmap is in IrcState!
+          -- not so bad - should always be okay to snapshot
+          case words msg of
+            "!state":_ -> do
+              points <- get
+              io $ writeFile stateFile $ show points
+            _ -> mcoin
 
 updateAndSay :: SayFun -> [String] -> B.PluginStateT Points
 updateAndSay say strs = do

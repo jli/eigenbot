@@ -14,13 +14,15 @@ build-type:    Simple
 executable eigenbot
     hs-source-dirs: src
     main-is: Main.hs
-    extensions: TemplateHaskell
+    extensions: FlexibleContexts, TemplateHaskell
     ghc-options: -Wall -fwarn-tabs
 
     build-depends:
         base == 4.*
       , containers
+      , directory
       , feed
+      , filepath
       , hslogger
       , hslogger-template
       , HTTP

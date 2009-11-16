@@ -29,7 +29,7 @@ type Project = String
 type Url = String
 
 data Repo = Repo User Project
-          deriving (Eq, Ord)
+          deriving (Eq, Ord, Read)
 
 instance Show Repo where
     show (Repo u p) = printf "%s/%s" u p
@@ -40,7 +40,7 @@ data Commit = Commit {
       _cTitle :: String
     , _cAuthor :: String
     , cTime :: String
-}
+} deriving (Read)
 
 instance Show Commit where
     show (Commit title _author _time) = title
@@ -49,7 +49,7 @@ data GithubState = St {
       _ghSubscribed :: [Repo]
     , _ghJustStarted :: Bool -- FIXME should be per-channel
     , _ghCommits :: RepoCommits
-}
+} deriving (Read)
 
 initState :: GithubState
 initState = St [eigenRepo] True M.empty
@@ -66,6 +66,7 @@ plugin = B.genPlugin
            "github: !subscribe user project, !last n user project"
            loop
            initState
+           Nothing
 
 -- use separate thread for polling?
 loop :: B.PluginLoop GithubState
