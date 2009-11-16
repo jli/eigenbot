@@ -1,24 +1,18 @@
 module Plugins.Simple (plugin) where
 
-import Control.Monad.State.Strict (get, put)
 import Data.List (find, isPrefixOf, isSuffixOf)
 import Data.Maybe (fromJust, isJust)
 import System.Time (getClockTime)
-import System.Random (StdGen, next, mkStdGen)
+import System.Random (randomIO)
 import Text.Printf (printf)
 
 import qualified Base as B
 import Util (io, mcoin, breakOnSpace, safeIndex)
 
-type RandState = StdGen
-
-initState :: RandState
-initState = mkStdGen 1337
-
 plugin :: B.Plugin
-plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop initState
+plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop ()
 
-loop :: B.PluginLoop RandState
+loop :: B.PluginLoop ()
 loop evq actq = do
     ev <- io $ B.readEvent evq
     case ev of
@@ -35,26 +29,25 @@ loop evq actq = do
                 [user] -> say $ printf "hey %s, THE WORLD IS A VAMPIRE" user
                 user:rest' -> say $ printf "hey %s, %s" user $ unwords rest'
             "!date" -> io getClockTime >>= say . printf "date is: %s" . show
-            _ -> do
-              gen <- get
-              case cuteness nick msg gen of
+            _ ->
+              case cuteness nick msg of
                 Nothing -> mcoin
-                Just (cuteMsg, gen') -> do
-                  say cuteMsg
-                  put gen'
+                Just cuteMsg -> do
+                     -- shorter way?
+                     cute <- io cuteMsg
+                     say cute
 
--- FIXME bleh. must be nicer way to wrap up state access?
-cuteness :: B.Nick -> String -> StdGen -> Maybe (String, StdGen)
-cuteness nick msg gen =
+cuteness :: B.Nick -> String -> Maybe (IO String)
+cuteness nick msg =
     if not mentionedMe
     then Nothing
-    else Just msgAndNewGen
+    else Just cute
   where mentionedMe = isJust $ find includesMe $ words msg
         includesMe str = B.me `isPrefixOf` str || B.me `isSuffixOf` str
-        msgAndNewGen =
-            let (i, gen') = next gen
-                formatFn = fromJust $ safeIndex cuteFormats i
-            in (formatFn nick, gen')
+        cute = do
+          i <- randomIO
+          let formatFn = fromJust $ safeIndex cuteFormats i
+          return $ formatFn nick
 
 cuteFormats :: [B.Nick -> String]
 cuteFormats =
