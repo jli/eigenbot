@@ -46,7 +46,8 @@ s1 +++ s2 = s1 ++ (' ':s2)
 
 calTimeString :: CalendarTime -> String
 calTimeString ct =
-    printf "%04d-%02d-%02d" (ctYear ct) (fromEnum $ ctMonth ct) (ctDay ct)
+    printf "%04d-%02d-%02d" (ctYear ct) month (ctDay ct)
+  where month = fromEnum (ctMonth ct) + 1
 
 getCalTime :: IO CalendarTime
 getCalTime = getClockTime >>= toCalendarTime
