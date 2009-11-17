@@ -32,9 +32,9 @@ import Control.Monad (forever, forM_, foldM, liftM, liftM2)
 import Control.Monad.State.Strict (StateT, runStateT, get, put)
 import Data.Map (Map)
 import qualified Data.Map as M
-import System.Directory (createDirectoryIfMissing, doesFileExist, getHomeDirectory)
+import System.Directory (createDirectoryIfMissing, doesFileExist,
+                         getAppUserDataDirectory)
 import System.Exit (exitWith, ExitCode(..))
-import System.FilePath ((</>))
 import System.IO (Handle, hGetLine, hPutStr, hSetBuffering, BufferMode (..))
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Printf (printf)
@@ -75,7 +75,7 @@ data Action = DoJoin Channel
 
 -- Father forgive me
 dotDir :: FilePath
-dotDir = unsafePerformIO $ (</> ".eigenbot") `liftM` getHomeDirectory
+dotDir = unsafePerformIO $ getAppUserDataDirectory "eigenbot"
 
 -- action and event queues
 newtype EvQ = EvQ (Chan Event)
