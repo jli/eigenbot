@@ -37,9 +37,12 @@ parseAndAnnounce actq chan strs =
 
 -- hmm, make this more expansive? \n\r case found here:
 -- http://www.cityofgainesville.org/tabid/156/Default.aspx
+-- tabs found on YouTube, wtf
 cleanTitle :: String -> String
-cleanTitle = filter (not . lineEnding)
+cleanTitle = map tabToSpace . filter (not . lineEnding)
   where lineEnding = (`elem` ['\n', '\r'])
+        tabToSpace '\t' = ' '
+        tabToSpace  c   = c
 
 getCleanTitle :: String -> IO (Maybe String)
 getCleanTitle url = getTitle url >>= return . (fmap cleanTitle)
