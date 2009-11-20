@@ -1,5 +1,7 @@
 module Util (
     (+++)
+  , (<||>)
+  , (<&&>)
   , appFst
   , calTimeString
   , getCalTime
@@ -43,6 +45,10 @@ import Text.Printf(printf)
 s1 +++ "" = s1
 "" +++ s2 = s2
 s1 +++ s2 = s1 ++ (' ':s2)
+
+(<&&>), (<||>) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
+p1 <&&> p2 = \a -> p1 a && p2 a
+p1 <||> p2 = \a -> p1 a || p2 a
 
 calTimeString :: CalendarTime -> String
 calTimeString ct =

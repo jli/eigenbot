@@ -1,5 +1,6 @@
 module Plugins.Simple (plugin) where
 
+import Data.Char (toLower)
 import Data.List (find, isPrefixOf, isSuffixOf)
 import Data.Maybe (fromJust, isJust)
 import System.Time (getClockTime)
@@ -7,7 +8,7 @@ import System.Random (randomIO)
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (io, mcoin, breakOnSpace, safeIndex)
+import Util ((<||>), io, mcoin, breakOnSpace, safeIndex)
 
 plugin :: B.Plugin
 plugin = B.genPlugin "simple plugin: !id, !tell, !date" loop () Nothing
@@ -43,7 +44,8 @@ cuteness nick msg =
     then Nothing
     else Just cute
   where mentionedMe = isJust $ find includesMe $ words msg
-        includesMe str = B.me `isPrefixOf` str || B.me `isSuffixOf` str
+        includesMe = ((B.me `isPrefixOf`) <||> (B.me `isSuffixOf`)) . lower
+        lower = map toLower
         cute = do
           i <- randomIO
           let formatFn = fromJust $ safeIndex cuteFormats i
