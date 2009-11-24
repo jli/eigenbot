@@ -61,7 +61,7 @@ getTitle' url = do
     return (eitherToMaybe e >>=
             listToMaybe . sections (~== "<title>") . parseTags >>=
             fromTitle)
-  where fromTitle ((TagOpen "title" []) : (TagText t) : _) = Just t
+  where fromTitle ((TagOpen "title" _attribs) : (TagText t) : _) = Just t
         fromTitle _ = Nothing
 
 okayToGet :: String -> IO Bool
