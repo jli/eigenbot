@@ -55,6 +55,8 @@ getTitle url = do
       False -> return Nothing
       True -> getTitle' url
 
+-- bugz:
+-- should work for <TITLE> too. wtf, man uhttp://research.microsoft.com/en-us/um/people/simonpj/papers/constraints/index.htm
 getTitle' :: String -> IO (Maybe String)
 getTitle' url = do
     e <- try $ getUrl url :: IO (Either SomeException String)
