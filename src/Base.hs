@@ -43,7 +43,7 @@ import qualified Network.IRC.Base as IRC
 import qualified Network.IRC.Parser as IRC
 import Network (PortID(..), PortNumber, connectTo)
 
-import Util((+++), io, doForever, mcoin, dropNewlines, maybeIO)
+import Util((+++), io, doForever, mcoin, dropNewlines, maybeIO, ellipsesSplit)
 
 
 type Nick = String
@@ -76,6 +76,9 @@ data Action = DoJoin Channel
 -- Father forgive me
 dotDir :: FilePath
 dotDir = unsafePerformIO $ getAppUserDataDirectory "eigenbot"
+
+ircMaxLineLen :: Int
+ircMaxLineLen = 512
 
 -- action and event queues
 newtype EvQ = EvQ (Chan Event)
@@ -179,6 +182,17 @@ genMsg, genMsgColon :: IrcCmd -> String -> String
 genMsg cmd rest = printf "%s %s\r\n" cmd rest
 genMsgColon cmd rest = genMsg cmd (':' : rest)
 
+-- Find the base length of a colon command. Useful for deciding how to
+-- split long messages.
+
+-- FIXME this doesn't take our nick+user+hostname part into account,
+-- and so gives a smaller value than is actually correct! eigenbot
+-- needs to handle more IRC events (in particular, the welcome message
+-- from the server) and store its hostname to be able to do this
+-- correctly!
+genMsgColonLen :: IrcCmd -> Int
+genMsgColonLen cmd = length $ genMsgColon cmd ""
+
 {- may be useful some day.
 netOfEvent :: Event -> NetName
 netOfEvent (Join (Channel n _) _nick) = n
@@ -197,13 +211,24 @@ netOfAction (DoInit n _nick) = n
 netOfAction (DoPong n _msg) = n
 
 -- use irc's Message?
-actionToMsg :: Action -> String
-actionToMsg (DoJoin (Channel _ chan)) = genMsg "JOIN" chan
-actionToMsg (DoPart (Channel _ chan) msg) = genMsgColon ("PART"+++chan) msg
-actionToMsg (DoChannelMsg (Channel _ chan) msg) = genMsgColon ("PRIVMSG"+++chan) msg
-actionToMsg (DoPrivMsg _net nick msg) = genMsgColon ("PRIVMSG"+++nick) msg
-actionToMsg (DoInit _net nick) = genMsg "NICK" nick ++ genMsg "USER" (nick ++ " 0 * :realname")
-actionToMsg (DoPong _net str) = genMsgColon "PONG" str
+
+-- invariants for DoChannelMsg: the base length of the IRC command
+-- (given by genMsgColonLen) must be less than ircMaxLineLen; the
+-- allowedLen must be big enough to allow messages returned from
+-- ellipsesSplit to fit (otherwise, you'll get a flippant message,
+-- though no crashes)
+actionToMsgs :: Action -> [String]
+actionToMsgs (DoJoin (Channel _ chan)) = [genMsg "JOIN" chan]
+actionToMsgs (DoPart (Channel _ chan) msg) = [genMsgColon ("PART"+++chan) msg]
+actionToMsgs (DoInit _net nick) = [genMsg "NICK" nick ++ genMsg "USER" (nick ++ " 0 * :realname")]
+actionToMsgs (DoPong _net str) = [genMsgColon "PONG" str]
+actionToMsgs (DoPrivMsg _net nick msg) = [genMsgColon ("PRIVMSG"+++nick) msg]
+actionToMsgs (DoChannelMsg (Channel _ chan) msg) = map (genMsgColon cmd) msgs
+  where cmd = "PRIVMSG"+++chan
+        msgs = case ellipsesSplit msg allowedLen of
+                 Just ms -> ms
+                 Nothing -> ["jli: aren't you glad this is a Maybe? :)"]
+        allowedLen = ircMaxLineLen - (genMsgColonLen cmd)
 
 -- FIXME NEEDS VERIFICATION
 parseEvent :: NetName -> IRC.Message -> Maybe Event
@@ -381,12 +406,12 @@ actionHandler handleMap actq = do
   case M.lookup net handleMap of
     Nothing -> error $ printf "no handle for net %s\n" net
     Just h -> do
-      printf "to %s <%s>\n" net (dropNewlines $ actionToMsg act)
+      mapM_ (printf "to %s <%s>\n" net) (map dropNewlines $ actionToMsgs act)
       sendActionToNet h act
 
 
 sendActionToNet :: Handle -> Action -> IO ()
-sendActionToNet h act = hPutStr h $ actionToMsg act
+sendActionToNet h act = mapM_ (hPutStr h) (actionToMsgs act)
 
 startPlugins :: [Plugin] -> EvQ -> ActQ -> IO ()
 startPlugins plugs evq actq = forM_ plugs startPlug

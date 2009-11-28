@@ -7,6 +7,7 @@ module Util (
   , calTimeString
   , getCalTime
   , plural
+  , ellipsesSplit
   , generalPlural
   , breakOnSpace
   , dropNewlines
@@ -80,6 +81,26 @@ dropNewlines = map nlToSpace
   where nlToSpace '\n' = ' '
         nlToSpace '\r' = ' '
         nlToSpace c = c
+
+-- This function returns Nothing if the limit is too small. The
+-- resulting strings in general may require eLen*2 amounts of padding,
+-- at the front and back, so the limit must be strictly greater than
+-- eLen*2.
+ellipses :: String
+ellipsesLen :: Int
+ellipses = ".."
+ellipsesLen = length ellipses
+
+ellipsesSplit :: String -> Int -> Maybe [String]
+ellipsesSplit s lim | lim <= ellipsesLen*2 = Nothing
+                    | otherwise = Just $ safeSplit s lim
+
+safeSplit :: String -> Int -> [String]
+safeSplit s lim | length s <= lim = [s]
+                | otherwise       = first' : safeSplit rest' lim
+  where (first, rest) = splitAt (lim-ellipsesLen) s
+        first' = first ++ ellipses
+        rest' = ellipses ++ rest
 
 delay :: Int -> IO ()
 delay = threadDelay . (* 10^(6::Integer)) -- better way to do this typehint?
