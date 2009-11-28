@@ -29,7 +29,7 @@ module Base (
 import Control.Concurrent (forkIO)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan, dupChan)
 import Control.Monad (forever, forM_, foldM, liftM, liftM2)
-import Control.Monad.State.Strict (StateT, runStateT, get, put)
+import Control.Monad.State.Strict (StateT, runStateT, get, put, modify)
 import Data.Map (Map)
 import qualified Data.Map as M
 import System.Directory (createDirectoryIfMissing, doesFileExist,
@@ -64,8 +64,11 @@ data Event = Join Channel Nick
            | ChannelMsg Channel Nick String
            | PrivMsg NetName Nick String -- nick is sending user
            | Ping NetName String
+           | Whois NetName String -- string is nick!~user@host
              deriving (Show)
 
+-- DoInit is initialization: NICK, USER, and a WHOIS so I can get my
+-- nick, user, and hostname.
 data Action = DoJoin Channel
             | DoPart Channel String
             | DoChannelMsg Channel String
@@ -148,6 +151,7 @@ data IrcState = IS {
     , stReqChannels :: [Channel]
     , stRoots :: RootMap -- per-network "root" users
     , stPlugins :: [Plugin] -- not sure how to dynamically load plugins
+    , stNickUserHost :: String -- my nick!~user@host string
     , stEvq :: EvQ
     , stActq :: ActQ
 }
@@ -220,7 +224,10 @@ netOfAction (DoPong n _msg) = n
 actionToMsgs :: Action -> [String]
 actionToMsgs (DoJoin (Channel _ chan)) = [genMsg "JOIN" chan]
 actionToMsgs (DoPart (Channel _ chan) msg) = [genMsgColon ("PART"+++chan) msg]
-actionToMsgs (DoInit _net nick) = [genMsg "NICK" nick ++ genMsg "USER" (nick ++ " 0 * :realname")]
+actionToMsgs (DoInit _net nick) = [ genMsg "NICK" nick
+                                  , genMsg "USER" (nick +++ "0 * :realname")
+                                  , genMsg "WHOIS" me
+                                  ]
 actionToMsgs (DoPong _net str) = [genMsgColon "PONG" str]
 actionToMsgs (DoPrivMsg _net nick msg) = [genMsgColon ("PRIVMSG"+++nick) msg]
 actionToMsgs (DoChannelMsg (Channel _ chan) msg) = map (genMsgColon cmd) msgs
@@ -243,7 +250,11 @@ parseEvent net (IRC.Message (Just (IRC.NickName nick _user _server)) cmd params)
         then Just $ PrivMsg net nick rest
         else Just $ ChannelMsg (Channel net toPart) nick rest
       _ -> Nothing
-parseEvent _net (IRC.Message (Just (IRC.Server _name)) _ _) = Nothing
+parseEvent net (IRC.Message (Just (IRC.Server _name)) cmd params) =
+    case (cmd, params) of
+      ("311", _toMe:nick:user:hostname:_rest) ->
+        Just $ Whois net $ printf "%s!%s@%s" nick user hostname
+      _ -> Nothing
 parseEvent net (IRC.Message Nothing cmd params) =
     case cmd of
       "PING" -> Just $ Ping net (params !! 0)
@@ -264,6 +275,7 @@ configToInitState (BotConfig nets chans roots plugins) =
     liftM2 (\evq actq -> IS { stInNets = [], stInChannels = []
                             , stReqNets = nets, stReqChannels = chans
                             , stRoots = roots, stPlugins = plugins
+                            , stNickUserHost = ""
                             , stEvq = evq, stActq = actq })
            newEvq newActq
 
@@ -275,7 +287,7 @@ setup = do
     io $ setupDirs
     -- called with state derived from BotConfig, so inNets and inChans
     -- will be empty
-    st@(IS [] [] reqNets reqChans _roots plugins evq actq) <- get
+    st@(IS [] [] reqNets reqChans _roots plugins _nuh evq actq) <- get
     -- hook up incoming events to evq through network parser, start
     -- actq handler for dispatching actions to networks
     io $ putStrLn "connect nets"
@@ -300,7 +312,7 @@ mainLoop = do
 
 handleNewRequests :: Irc ()
 handleNewRequests = do
-    st@(IS inNets inChans reqNets reqChans _roots _plugins _evq actq) <- get
+    st@(IS inNets inChans reqNets reqChans _roots _plugins _nuh _evq actq) <- get
     (reqNets', newNets) <- io $ connectNewNets actq reqNets
     (reqChans', newChans) <- io $ joinNewChans actq reqChans
     put $ st { stInNets = inNets ++ newNets
@@ -317,9 +329,12 @@ handleNewRequests = do
 
 handleEvent :: Irc ()
 handleEvent = do
-    IS _inNets _inChans _reqNets _reqChans roots _plugins evq actq <- get
+    IS _inNets _inChans _reqNets _reqChans roots _plugins _nuh evq actq <- get
     ev <- io $ readEvent evq
     case ev of
+      Whois _net nuh -> do
+        modify (\s -> s { stNickUserHost = nuh })
+        io $ printf "Got welcome message! NickUserHost set to <%s>\n" nuh
       Ping net msg -> io $ pong actq net msg
       Join _chan _nick -> mcoin
       Part _chan _nick _msg -> mcoin
@@ -331,7 +346,7 @@ handleEvent = do
 
 controller :: NetName -> Nick -> String -> Irc ()
 controller net nick msg = do
-    st@(IS _inNets _inChans _reqNets reqChans _roots _plugins _evq actq) <- get
+    st@(IS _inNets _inChans _reqNets reqChans _roots _plugins _nuh _evq actq) <- get
     let reply = pm actq net nick
     case words msg of
       ["!join", chan] -> do
