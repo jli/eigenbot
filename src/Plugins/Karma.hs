@@ -10,7 +10,7 @@ import System.FilePath ((</>))
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (io, mcoin, maybeIO, plural)
+import Util (concatComma, io, mcoin, maybeIO, plural)
 
 type Points = Map B.Nick Integer
 --type Reasons = Map B.Nick [String]
@@ -64,12 +64,18 @@ loop evq actq = do
   where handleChanMsg chan _sendingNick msg =
           let say = B.say actq chan in
           case words msg of
-            "!karma":nick:_ -> printPoints say nick
             ["!karma"] -> printAll say
-            rest -> updateAndSay say rest
-        printPoints say nick = do
+            ["!karma", one] -> printOne say one
+            "!karma":many -> printPoints say many
+            other -> updateAndSay say other
+        printOne say nick = do
           points <- get
           io $ say $ nickPointsStr points nick
+        printPoints say nicks = do
+          points <- get
+          case nicksPointsStr points nicks of
+            "" -> mcoin
+            nonempty -> io $ say $ nonempty
         printAll say = do
           points <- get
           io $ say $ showAll points
@@ -95,15 +101,17 @@ updateAndSay say strs = do
         announce _points [] = Nothing
         announce points nicks =
          let changeStrs = map (\n -> nickPointsStr points n) nicks in
-         Just $ foldr buildString "" changeStrs
-        buildString str "" = str
-        buildString str rest = str ++ ", " ++ rest
+         Just $ concatComma changeStrs
 
 nickPointsStr :: Points -> B.Nick -> String
 nickPointsStr points nick =
     case M.lookup nick points of
       Nothing -> printf "%s has 0 points" nick
       Just p -> printf "%s has %s" nick $ plural "point" p
+
+nicksPointsStr :: Points -> [String] -> String
+nicksPointsStr points nicks = concatComma $ map (nickPointsStr points) realNicks
+  where realNicks = [ nick | nick <- nicks, M.member nick points ]
 
 -- stringify entire points map. limit?
 showAll :: Points -> String

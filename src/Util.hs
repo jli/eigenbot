@@ -3,6 +3,7 @@ module Util (
   , (<||>)
   , (<&&>)
   , appFst
+  , concatComma
   , calTimeString
   , getCalTime
   , plural
@@ -28,7 +29,7 @@ module Util (
 import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Monad (forever)
 import Control.Monad.Trans (MonadIO, liftIO)
-import Data.List (isPrefixOf)
+import Data.List (intersperse, isPrefixOf)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
@@ -67,6 +68,9 @@ plural one n = generalPlural one (one++"s") n
 
 appFst :: (a -> z) -> (a, b) -> (z, b)
 appFst f (one, two) = (f one, two)
+
+concatComma :: [String] -> String
+concatComma = concat . intersperse ", "
 
 breakOnSpace :: String -> (String, String)
 breakOnSpace = break (== ' ')
