@@ -11,7 +11,7 @@ import Data.List (find, isPrefixOf)
 import Data.Maybe (fromJust, isJust, listToMaybe)
 
 import Network.HTTP.Headers (Header(..), HeaderName(..))
-import Text.HTML.TagSoup (Tag(..), sections, (~==))
+import Text.HTML.TagSoup (Tag(..), (~==), canonicalizeTags, sections)
 import Text.HTML.TagSoup.Parser (parseTags)
 
 import qualified Base as B
@@ -57,7 +57,7 @@ getTitle' :: String -> IO (Maybe String)
 getTitle' url = do
     e <- try $ getUrl url :: IO (Either SomeException String)
     return (eitherToMaybe e >>=
-            listToMaybe . sections (~== "<title>") . parseTags >>=
+            listToMaybe . sections (~== "<title>") . canonicalizeTags . parseTags >>=
             fromTitle)
   where fromTitle ((TagOpen "title" _attribs) : (TagText t) : _) = Just t
         fromTitle _ = Nothing
