@@ -424,7 +424,6 @@ actionHandler handleMap actq = do
       mapM_ (printf "to %s <%s>\n" net . dropNewlines) (actionToMsgs act)
       sendActionToNet h act
 
-
 sendActionToNet :: Handle -> Action -> IO ()
 sendActionToNet h act = mapM_ (hPutStr h) (actionToMsgs act)
 
