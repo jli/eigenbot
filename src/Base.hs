@@ -43,7 +43,7 @@ import qualified Network.IRC.Base as IRC
 import qualified Network.IRC.Parser as IRC
 import Network (PortID(..), PortNumber, connectTo)
 
-import Util((+++), io, doForever, mcoin, dropNewlines, maybeIO, ellipsesSplit)
+import Util((+++), io, doForever, mcoin, dropNewlines, maybeM, ellipsesSplit)
 
 
 type Nick = String
@@ -235,16 +235,16 @@ actionToMsgs (DoChannelMsg (Channel _ chan) msg) = map (genMsgColon cmd) msgs
         msgs = case ellipsesSplit msg allowedLen of
                  Just ms -> ms
                  Nothing -> ["jli: aren't you glad this is a Maybe? :)"]
-        allowedLen = ircMaxLineLen - (genMsgColonLen cmd)
+        allowedLen = ircMaxLineLen - genMsgColonLen cmd
 
 -- FIXME NEEDS VERIFICATION
 parseEvent :: NetName -> IRC.Message -> Maybe Event
 parseEvent net (IRC.Message (Just (IRC.NickName nick _user _server)) cmd params) =
     case cmd of
-      "JOIN" -> Just $ Join (Channel net (params !! 0)) nick
-      "PART" -> Just $ Part (Channel net (params !! 0)) nick (params !! 1)
+      "JOIN" -> Just $ Join (Channel net (head params)) nick
+      "PART" -> Just $ Part (Channel net (head params)) nick (params !! 1)
       "PRIVMSG" ->
-        let toPart = params !! 0
+        let toPart = head params
             rest = unwords $ drop 1 params in
         if isMe toPart
         then Just $ PrivMsg net nick rest
@@ -257,7 +257,7 @@ parseEvent net (IRC.Message (Just (IRC.Server _name)) cmd params) =
       _ -> Nothing
 parseEvent net (IRC.Message Nothing cmd params) =
     case cmd of
-      "PING" -> Just $ Ping net (params !! 0)
+      "PING" -> Just $ Ping net (head params)
       _ -> Nothing
 
 
@@ -284,7 +284,7 @@ configToInitState (BotConfig nets chans roots plugins) =
 setup :: Irc ()
 setup = do
     io $ putStrLn "begin setup"
-    io $ setupDirs
+    io setupDirs
     -- called with state derived from BotConfig, so inNets and inChans
     -- will be empty
     st@(IS [] [] reqNets reqChans _roots plugins _nuh evq actq) <- get
@@ -298,7 +298,7 @@ setup = do
     put $ st { stInNets = inNets, stInChannels = inChans
              , stReqNets = [], stReqChannels = [] }
     io $ putStrLn "enter listen loop"
-    forever $ mainLoop
+    forever mainLoop
   where setupDirs = createDirectoryIfMissing True dotDir
 
 -- main loop that controls IRC state. ultimately, would like to be
@@ -351,7 +351,7 @@ controller net nick msg = do
     case words msg of
       ["!join", chan] -> do
         io $ reply "adding to requested channels"
-        put $ st { stReqChannels = (Channel net chan) : reqChans }
+        put $ st { stReqChannels = Channel net chan : reqChans }
       ["!part", chan] ->
         io $ do reply "leaving now..."
                 part actq (Channel net chan) "PUPPETS SAY YES"
@@ -383,7 +383,7 @@ connectNets nets evq actq = do
     forkNetHandlers handleMap
     forkActionHandler handleMap
     initConnects handleMap
-    return $ nets
+    return nets
 
   where buildHandleMap = foldM insertHandle M.empty
         insertHandle _         (Net name []) = error $ "No servers for"+++name
@@ -412,7 +412,7 @@ netHandler net h evq = do
     printf "from %s: <%s>\n" net $ dropNewlines line
     case IRC.decode line of
       Nothing -> putStrLn "netHandler failed a parse!" -- FIXME debug error
-      Just msg -> maybeIO (addEvent evq) (parseEvent net msg)
+      Just msg -> maybeM (addEvent evq) (parseEvent net msg)
 
 actionHandler :: Map NetName Handle -> ActQ -> IO ()
 actionHandler handleMap actq = do
@@ -421,7 +421,7 @@ actionHandler handleMap actq = do
   case M.lookup net handleMap of
     Nothing -> error $ printf "no handle for net %s\n" net
     Just h -> do
-      mapM_ (printf "to %s <%s>\n" net) (map dropNewlines $ actionToMsgs act)
+      mapM_ (printf "to %s <%s>\n" net . dropNewlines) (actionToMsgs act)
       sendActionToNet h act
 
 
@@ -442,4 +442,4 @@ startPlugins plugs evq actq = forM_ plugs startPlug
 joinChans :: [Channel] -> ActQ -> IO [Channel]
 joinChans chans actq = do
     forM_ chans (\c -> addAction actq $ DoJoin c)
-    return $ chans
+    return chans

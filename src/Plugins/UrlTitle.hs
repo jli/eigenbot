@@ -15,7 +15,7 @@ import Text.HTML.TagSoup (Tag(..), sections, (~==))
 import Text.HTML.TagSoup.Parser (parseTags)
 
 import qualified Base as B
-import Util (io, mcoin, getUrl, headUrl, probablyUrl, maybeIO, eitherToMaybe)
+import Util (io, mcoin, getUrl, headUrl, probablyUrl, maybeM, eitherToMaybe)
 
 plugin :: B.Plugin
 plugin = B.genPlugin "urltitle: fetches titles" loop () Nothing
@@ -30,9 +30,7 @@ loop evq actq = do
 parseAndAnnounce :: B.ActQ -> B.Channel -> [String] -> B.PluginStateT ()
 parseAndAnnounce actq chan strs =
     io $ mapM_ (forkIO . announceMaybe) $ filter probablyUrl strs
-  where announceMaybe url = do
-          maybeTitle <- getCleanTitle url
-          maybeIO sayTitle maybeTitle
+  where announceMaybe url = getCleanTitle url >>= maybeM sayTitle
         sayTitle = B.say actq chan . ("title: " ++ )
 
 -- hmm, make this more expansive? \n\r case found here:
@@ -40,20 +38,18 @@ parseAndAnnounce actq chan strs =
 -- tabs found on YouTube, wtf
 cleanTitle :: String -> String
 cleanTitle = map tabToSpace . filter (not . lineEnding)
-  where lineEnding = (`elem` ['\n', '\r'])
+  where lineEnding = (`elem` "\n\r")
         tabToSpace '\t' = ' '
         tabToSpace  c   = c
 
 getCleanTitle :: String -> IO (Maybe String)
-getCleanTitle url = getTitle url >>= return . (fmap cleanTitle)
+getCleanTitle url = fmap cleanTitle `fmap` getTitle url
 
 -- checks that the URL is "safe" to get
 getTitle :: String -> IO (Maybe String)
 getTitle url = do
     okay <- okayToGet url
-    case okay of
-      False -> return Nothing
-      True -> getTitle' url
+    if okay then getTitle' url else return Nothing
 
 -- bugz:
 -- should work for <TITLE> too. wtf, man uhttp://research.microsoft.com/en-us/um/people/simonpj/papers/constraints/index.htm
@@ -67,7 +63,7 @@ getTitle' url = do
         fromTitle _ = Nothing
 
 okayToGet :: String -> IO Bool
-okayToGet url = headUrl url >>= return . headersOkay
+okayToGet url = headersOkay `fmap` headUrl url
 
 -- bugz:
 -- http://www.eng.uwaterloo.ca/~aavogt/xmonad/docs/XMonad-Actions-TopicSpace.html

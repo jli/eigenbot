@@ -16,7 +16,7 @@ module Util (
   , mcoin
   , eitherToMaybe
   , io
-  , maybeIO
+  , maybeM
   , lookupExn
   , insertCons
   , insertAppend
@@ -117,11 +117,11 @@ eitherToMaybe = either (const Nothing) Just
 io :: MonadIO m => IO a -> m a
 io = liftIO
 
-maybeIO :: (a -> IO ()) -> Maybe a -> IO ()
-maybeIO f m = maybe (mcoin) f m
+maybeM :: Monad m => (a -> m ()) -> Maybe a -> m ()
+maybeM = maybe mcoin
 
 lookupExn :: Ord k => k -> Map k v -> v
-lookupExn k m = fromJust $ M.lookup k m
+lookupExn k v = fromJust $ M.lookup k v
 
 insertCons :: Ord k => k -> v -> Map k [v] -> Map k [v]
 insertCons k v = M.insertWith' (++) k [v]
@@ -135,14 +135,14 @@ fetchUrl url method = do
       (_, rsp) <- Network.Browser.browse $ do
                setAllowRedirects True -- handle HTTP redirects
                setMaxRedirects $ Just 5
-               request $ ((getRequest url) { rqMethod = method })
+               request ((getRequest url) { rqMethod = method })
       return rsp
 
 getUrl :: String -> IO String
 getUrl url = fetchUrl url GET >>= getResponseBody . Right
 
 headUrl :: String -> IO [Header]
-headUrl url = fetchUrl url HEAD >>= return . rspHeaders
+headUrl url = rspHeaders `fmap` fetchUrl url HEAD
 
 probablyUrl :: String -> Bool
 probablyUrl s =

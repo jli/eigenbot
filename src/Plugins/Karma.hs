@@ -10,7 +10,7 @@ import System.FilePath ((</>))
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (concatComma, io, mcoin, maybeIO, plural)
+import Util (concatComma, io, mcoin, maybeM, plural)
 
 type Points = Map B.Nick Integer
 --type Reasons = Map B.Nick [String]
@@ -75,7 +75,7 @@ loop evq actq = do
           points <- get
           case nicksPointsStr points nicks of
             "" -> mcoin
-            nonempty -> io $ say $ nonempty
+            nonempty -> io $ say nonempty
         printAll say = do
           points <- get
           io $ say $ showAll points
@@ -94,9 +94,9 @@ updateAndSay say strs = do
     let updates = mapMaybe scoreNick strs
         changed = nub $ map nickOfUpdate updates
         newPoints = foldr updatePoints oldPoints updates
-    io $ maybeIO say (announce newPoints changed)
+    io $ maybeM say (announce newPoints changed)
     put newPoints
-  where updatePoints (Up nick) = M.insertWith' (+) nick (1)
+  where updatePoints (Up nick) = M.insertWith' (+) nick 1
         updatePoints (Down nick) = M.insertWith' (+) nick (-1)
         announce _points [] = Nothing
         announce points nicks =

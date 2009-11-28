@@ -33,10 +33,7 @@ loop evq actq = do
             _ ->
               case cuteness nick msg of
                 Nothing -> mcoin
-                Just cuteMsg -> do
-                     -- shorter way?
-                     cute <- io cuteMsg
-                     say cute
+                Just cuteMsg -> io cuteMsg >>= say
 
 cuteness :: B.Nick -> String -> Maybe (IO String)
 cuteness nick msg =

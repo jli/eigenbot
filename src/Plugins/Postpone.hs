@@ -37,7 +37,7 @@ loop evq actq = do
     saveMap <- get
     ev <- io $ B.readEvent evq
     case ev of
-      B.ChannelMsg chan nick msg -> do
+      B.ChannelMsg chan nick msg ->
         case words msg of
           "!postpone":user:rest -> do
               time <- io getCalTime

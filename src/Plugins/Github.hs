@@ -9,7 +9,7 @@
 
 module Plugins.Github (plugin) where
 
-import Control.Monad (foldM, forM_, mapM_, when)
+import Control.Monad (foldM, forM_, mapM_, unless)
 import Control.Monad.State.Strict (get, put)
 import Data.Function (on)
 import Data.Map (Map)
@@ -73,7 +73,7 @@ loop :: B.PluginLoop GithubState
 loop _evq actq = do
     St subscribed justStarted commits <- get
     newCommits <- io $ fetchAll subscribed
-    io $ when (not justStarted) $ announceNew actq newCommits commits
+    io $ unless justStarted $ announceNew actq newCommits commits
     put $ St subscribed False newCommits
     io $ delay 120 -- make configurable
 
@@ -85,7 +85,7 @@ fetchAll repos =
           return $ M.insert repo cs commitMap
 
 fetchCommits :: Repo -> IO [Commit]
-fetchCommits repo = simpleHttp (rssUrl repo) >>= return . pageToCommits
+fetchCommits repo = pageToCommits `fmap` simpleHttp (rssUrl repo)
 
 parseAtomString :: String -> Maybe Atom.Feed
 parseAtomString s =
