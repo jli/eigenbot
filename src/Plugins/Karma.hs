@@ -1,8 +1,7 @@
 module Plugins.Karma (plugin) where
 
-import Control.Monad (mplus)
 import Control.Monad.State.Strict (get, put)
-import Data.List (nub)
+import Data.List (isSuffixOf, nub)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
@@ -31,25 +30,21 @@ plugin = B.genPlugin
 
 data Update = Up B.Nick
             | Down B.Nick
+              deriving (Show)
 
 nickOfUpdate :: Update -> B.Nick
 nickOfUpdate (Up n) = n
 nickOfUpdate (Down n) = n
 
-scoreNickPre, scoreNick :: String -> Maybe Update
-scoreNickPre ('+':'+':[]) = Nothing
-scoreNickPre ('-':'-':[]) = Nothing
-scoreNickPre ('+':'+':nick) = Just $ Up nick
-scoreNickPre ('-':'-':nick) = Just $ Down nick
-scoreNickPre _ = Nothing
+dropLast :: Int -> [a] -> [a]
+dropLast n xs = take (max 0 ((length xs) - n)) xs
 
-reverseUpdate :: Update -> Update
-reverseUpdate (Up s) = Up $ reverse s
-reverseUpdate (Down s) = Down $ reverse s
-
-scoreNick word = scoreNickPre word `mplus` maybeReversed
-  where maybeReversed =
-          fmap reverseUpdate (scoreNickPre $ reverse word)
+scoreNick :: String -> Maybe Update
+scoreNick "++" = Nothing
+scoreNick "--" = Nothing
+scoreNick word | "++" `isSuffixOf` word = Just $ Up $ dropLast 2 word
+               | "--" `isSuffixOf` word = Just $ Down $ dropLast 2 word
+               | otherwise = Nothing
 
 -- FIXME make standard?
 type SayFun = String -> IO ()
