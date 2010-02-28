@@ -6,7 +6,6 @@ module Plugins.UrlTitle (plugin) where
 
 import Control.Concurrent (forkIO)
 import Control.Exception (SomeException, try)
-import Control.Monad (mapM_)
 import Data.List (find, isPrefixOf)
 import Data.Maybe (fromJust, isJust, listToMaybe)
 
@@ -15,7 +14,7 @@ import Text.HTML.TagSoup (Tag(..), (~==), canonicalizeTags, sections)
 import Text.HTML.TagSoup (parseTags)
 
 import qualified Base as B
-import Util (io, mcoin, getUrl, headUrl, probablyUrl, maybeM, eitherToMaybe)
+import Util (collapse, io, mcoin, getUrl, headUrl, probablyUrl, maybeM, eitherToMaybe)
 
 plugin :: B.Plugin
 plugin = B.genPlugin "urltitle: fetches titles" loop () Nothing
@@ -37,7 +36,7 @@ parseAndAnnounce actq chan strs =
 -- http://www.cityofgainesville.org/tabid/156/Default.aspx
 -- tabs found on YouTube, wtf
 cleanTitle :: String -> String
-cleanTitle = map tabToSpace . filter (not . lineEnding)
+cleanTitle = collapse ' ' . map tabToSpace . filter (not . lineEnding)
   where lineEnding = (`elem` "\n\r")
         tabToSpace '\t' = ' '
         tabToSpace  c   = c

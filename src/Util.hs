@@ -3,6 +3,7 @@ module Util (
   , (<||>)
   , (<&&>)
   , appFst
+  , collapse
   , concatComma
   , dropLast
   , calTimeString
@@ -70,6 +71,13 @@ plural one n = generalPlural one (one++"s") n
 
 appFst :: (a -> z) -> (a, b) -> (z, b)
 appFst f (one, two) = (f one, two)
+
+-- repeated values are collpased into just 1 instance
+collapse :: Eq a => a -> [a] -> [a]
+collapse x xs = concat $ map oneChar $ group xs
+  where oneChar ys@(y:_) | y == x = [y]
+                         | otherwise = ys
+        oneChar ys = ys -- 'group' should never give empty lists... but okay
 
 concatComma :: [String] -> String
 concatComma = concat . intersperse ", "
