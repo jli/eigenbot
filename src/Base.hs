@@ -117,7 +117,7 @@ type Plugin = EvQ -> ActQ -> IO ()
 genPlugin :: (Read s) => String -> PluginLoop s -> s -> Maybe FilePath -> Plugin
 genPlugin description loop initState savedFile =
     \evq actq -> do
-       printf "plugin starting: %s\n" description
+       (printf "plugin starting: %s\n" description :: IO ())
        state <- case savedFile of
                   Nothing -> return initState
                   Just f -> do
@@ -125,7 +125,7 @@ genPlugin description loop initState savedFile =
                     if exists
                       then read `liftM` readFile f
                       else return initState
-       runStateT (forever $ loop evq actq) state
+       _ <- runStateT (forever $ loop evq actq) state
        mcoin
 
 runPlugin :: Plugin -> EvQ -> ActQ -> IO ()
@@ -267,7 +267,7 @@ parseEvent net (IRC.Message Nothing cmd params) =
 runBot :: BotConfig -> IO ()
 runBot config = do
     initState <- configToInitState config
-    runStateT setup initState
+    _ <- runStateT setup initState
     mcoin
 
 configToInitState :: BotConfig -> IO IrcState
@@ -324,7 +324,7 @@ handleNewRequests = do
           putStrLn "NETWORK CONNECTION REQUEST FAILED. Not implemented yet."
           return ([], [])
         joinNewChans actq requests = do
-          joinChans requests actq
+          _ <- joinChans requests actq
           return ([], requests)
 
 handleEvent :: Irc ()
@@ -381,7 +381,7 @@ connectNets :: [Net] -> EvQ -> ActQ -> IO [Net]
 connectNets nets evq actq = do
     handleMap <- buildHandleMap nets
     forkNetHandlers handleMap
-    forkActionHandler handleMap
+    _ <- forkActionHandler handleMap
     initConnects handleMap
     return nets
 
@@ -409,7 +409,7 @@ connectNets nets evq actq = do
 netHandler :: NetName -> Handle -> EvQ -> IO ()
 netHandler net h evq = do
     line <- hGetLine h
-    printf "from %s: <%s>\n" net $ dropNewlines line
+    (printf "from %s: <%s>\n" net $ dropNewlines line :: IO ())
     case IRC.decode line of
       Nothing -> putStrLn "netHandler failed a parse!" -- FIXME debug error
       Just msg -> maybeM (addEvent evq) (parseEvent net msg)
