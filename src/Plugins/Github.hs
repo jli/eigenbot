@@ -9,7 +9,7 @@
 
 module Plugins.Github (plugin) where
 
-import Control.Monad (foldM, forM_, mapM_, unless)
+import Control.Monad (foldM, forM_, unless)
 import Control.Monad.State.Strict (get, put)
 import Data.Function (on)
 import Data.Map (Map)
