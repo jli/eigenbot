@@ -12,7 +12,7 @@ import Data.Maybe (fromJust, isJust, listToMaybe)
 
 import Network.HTTP.Headers (Header(..), HeaderName(..))
 import Text.HTML.TagSoup (Tag(..), (~==), canonicalizeTags, sections)
-import Text.HTML.TagSoup.Parser (parseTags)
+import Text.HTML.TagSoup (parseTags)
 
 import qualified Base as B
 import Util (io, mcoin, getUrl, headUrl, probablyUrl, maybeM, eitherToMaybe)
