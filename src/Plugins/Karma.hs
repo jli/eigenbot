@@ -9,7 +9,7 @@ import System.FilePath ((</>))
 import Text.Printf (printf)
 
 import qualified Base as B
-import Util (concatComma, io, mcoin, maybeM, plural)
+import Util (concatComma, dropLast, io, mcoin, maybeM, plural)
 
 type Points = Map B.Nick Integer
 --type Reasons = Map B.Nick [String]
@@ -35,9 +35,6 @@ data Update = Up B.Nick
 nickOfUpdate :: Update -> B.Nick
 nickOfUpdate (Up n) = n
 nickOfUpdate (Down n) = n
-
-dropLast :: Int -> [a] -> [a]
-dropLast n xs = take (max 0 ((length xs) - n)) xs
 
 scoreNick :: String -> Maybe Update
 scoreNick "++" = Nothing

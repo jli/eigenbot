@@ -4,6 +4,7 @@ module Util (
   , (<&&>)
   , appFst
   , concatComma
+  , dropLast
   , calTimeString
   , getCalTime
   , plural
@@ -30,7 +31,7 @@ module Util (
 import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Monad (forever)
 import Control.Monad.Trans (MonadIO, liftIO)
-import Data.List (intersperse, isPrefixOf)
+import Data.List (group, intersperse, isPrefixOf)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
@@ -72,6 +73,9 @@ appFst f (one, two) = (f one, two)
 
 concatComma :: [String] -> String
 concatComma = concat . intersperse ", "
+
+dropLast :: Int -> [a] -> [a]
+dropLast n xs = take (max 0 ((length xs) - n)) xs
 
 breakOnSpace :: String -> (String, String)
 breakOnSpace = break (== ' ')
